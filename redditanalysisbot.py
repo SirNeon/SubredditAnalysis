@@ -340,15 +340,7 @@ if __name__ == "__main__":
         # iterate through the drilldownList to get data
         for subreddit in drilldownList:
 
-            if(subreddit == "quit"):
-                print "Quitting..."
-                exit(0)
-
-            elif(subreddit == ".quit"):
-                print "Quitting..."
-                exit(0)
-
-            elif(subreddit == 'q'):
+            if(subreddit in ['quit', '.quit', 'q']):
                 print "Quitting..."
                 exit(0)
 
