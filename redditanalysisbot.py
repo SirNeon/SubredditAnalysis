@@ -85,46 +85,40 @@ class SubredditAnalysis(object):
         submissions = self.client.get_subreddit(subreddit).get_hot(limit=self.scrapeLimit)
 
         # userbase in the selected subreddit to be scanned
-        self.authorList = []
-
-        # submissionCount keeps tally of which thread
-        # the crawler is working on
-        self.submissionCount = 0
+        self.userList = []
 
         # get the thread creator and if he's not
-        # in the authorList then add him there
-        for submission in submissions:
+        # in the userList then add him there
+        for i, submission in enumerate(submissions):
             try:
-                author = str(submission.author)
+                submitter = str(submission.author)
 
             except AttributeError:
                 continue
 
-            self.submissionCount += 1
-
             # make sure that users don't get added multiple times
-            if author not in self.authorList:
-                self.authorList.append(author)
-                print "%d users found up to thread (%d / %d)." % (len(self.authorList), self.submissionCount, self.scrapeLimit)
+            if submitter not in self.userList:
+                self.userList.append(submitter)
+                print "%d users found up to thread (%d / %d)." % (len(self.userList), i + 1, self.scrapeLimit)
 
 
             # load more comments
             submission.replace_more_comments(limit=None, threshold=0)
 
             # get the comment authors and append
-            # them to authorList for scanning
-            for comment in submission.comments:
+            # them to userList for scanning
+            for comment in praw.helpers.flatten_tree(submission.comments):
                 try:
-                    cauthor = str(comment.author)
+                    commenter = str(comment.author)
 
                 except AttributeError:
                     continue
 
-                if cauthor not in self.authorList:
-                    self.authorList.append(cauthor)
-                    print "%d users found up to thread (%d / %d)." % (len(self.authorList), self.submissionCount, self.scrapeLimit)
+                if commenter not in self.userList:
+                    self.userList.append(commenter)
+                    print "%d users found up to thread (%d / %d)." % (len(self.userList), i + 1, self.scrapeLimit)
 
-        return self.authorList
+        return self.userList
 
 
     def get_subs(self, userList):
@@ -140,20 +134,16 @@ class SubredditAnalysis(object):
         print "Scanning for overlapping subreddits..."
 
         # list of overlapping subreddits
-        self.subredditList = []
+        subredditList = []
 
         # keeps count on overlapping users
         self.counter = Counter()
 
-        # keeps tally on which user the crawler
-        # is currently working on
-        self.userCounter = len(userList)
-
         # iterate through the list of users in order
         # to get their comments for crossreferencing
-        for i in range(0, len(userList)):
+        for i, user in enumerate(userList):
             try:
-                comments = self.client.get_redditor(userList[i]).get_comments('all')
+                comments = self.client.get_redditor(user).get_comments('all')
 
             # handle shadowbanned/deleted accounts
             except HTTPError:
@@ -163,9 +153,10 @@ class SubredditAnalysis(object):
             # posts from being tallied
             self.userDone = []
 
-            self.userCounter -= 1
+            # keeps track of how many users are remaining
+            usersLeft = len(userList) - i - 1
 
-            print "(%d / %d) users remaining." % (self.userCounter, len(userList))
+            print "(%d / %d) users remaining." % (usersLeft, len(userList))
 
             for comment in comments:
                 csubreddit = str(comment.subreddit)
@@ -177,10 +168,10 @@ class SubredditAnalysis(object):
 
                 # add the ones that aren't kept in the list
                 # to the list of subreddits
-                if((csubreddit not in self.subredditList) & (csubreddit not in self.banList)):
-                    self.subredditList.append(csubreddit)
+                if((csubreddit not in subredditList) & (csubreddit not in self.banList)):
+                    subredditList.append(csubreddit)
 
-        return self.subredditList
+        return subredditList
 
 
     def create_tuples(self, subreddit, subredditList):
