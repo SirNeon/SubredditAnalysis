@@ -8,8 +8,8 @@ from requests import HTTPError
 
 
 class SubredditAnalysis(object):
-    
-    
+
+
     def __init__(self):
         """
         Initialize the class with some basic attributes.
@@ -23,11 +23,11 @@ class SubredditAnalysis(object):
         self.post_to = "SubredditAnalysis"
 
         self.useragent = "Reddit Analysis Bot by /u/SirNeon"
-        
+
         # optional logging
         self.infoLogging = False
         self.errorLogging = False
-        
+
         # I've banned defaults and former defaults since
         # there's bound to be overlap with those due to
         # how Reddit autosubscribes users to them
@@ -50,7 +50,7 @@ class SubredditAnalysis(object):
             "worldnews", "WritingPrompts", "WTF"
         ]
 
-    
+
     def login(self, username, password):
         """
         This function logs the bot into its Reddit account.
@@ -63,7 +63,7 @@ class SubredditAnalysis(object):
         try:
             self.client.login(username, password)
             print "Login successful."
-        
+
         except (praw.errors.InvalidUser, praw.errors.InvalidUserPass) as e:
             print e
             self.log_err(e)
@@ -96,7 +96,7 @@ class SubredditAnalysis(object):
         for submission in submissions:
             try:
                 author = str(submission.author)
-            
+
             except AttributeError:
                 continue
 
@@ -106,9 +106,7 @@ class SubredditAnalysis(object):
             if author not in self.authorList:
                 self.authorList.append(author)
                 print "%d users found up to thread (%d / %d)." % (len(self.authorList), self.submissionCount, self.scrapeLimit)
-            
-            else:
-                pass
+
 
             # load more comments
             submission.replace_more_comments(limit=None, threshold=0)
@@ -126,18 +124,15 @@ class SubredditAnalysis(object):
                     self.authorList.append(cauthor)
                     print "%d users found up to thread (%d / %d)." % (len(self.authorList), self.submissionCount, self.scrapeLimit)
 
-                else:
-                    continue
-
         return self.authorList
 
-    
+
     def get_subs(self, userList):
         """
         This function uses the list collected by get_users()
-        in order to find the crossover subreddits. It takes 1 
-        argument which is a list of users to scan through. 
-        It then stores the results in a list which will be 
+        in order to find the crossover subreddits. It takes 1
+        argument which is a list of users to scan through.
+        It then stores the results in a list which will be
         put into tuples and then sorted. It returns a list of
         subreddits.
         """
@@ -175,28 +170,22 @@ class SubredditAnalysis(object):
             for comment in comments:
                 csubreddit = str(comment.subreddit)
                 if csubreddit not in self.userDone:
-                    # keep tabs on how many 
+                    # keep tabs on how many
                     # users post to a subreddit
                     self.counter[csubreddit] += 1
                     self.userDone.append(csubreddit)
-                
-                else:
-                    pass
 
                 # add the ones that aren't kept in the list
                 # to the list of subreddits
                 if((csubreddit not in self.subredditList) & (csubreddit not in self.banList)):
                     self.subredditList.append(csubreddit)
 
-                else:
-                    continue
-
         return self.subredditList
 
-    
+
     def create_tuples(self, subreddit, subredditList):
         """
-        This function takes 2 arguments, the first which 
+        This function takes 2 arguments, the first which
         is the subreddit that is being targeted for the drilldown.
         The second is the list of subreddits which will be put
         into tuples for storage. It returns a list of tuples.
@@ -217,16 +206,13 @@ class SubredditAnalysis(object):
             if((item.lower() != subreddit.lower()) & (self.intCounter >= 10)):
                 self.subredditTuple.append((item, self.intCounter))
 
-            else:
-                pass
-
         # sorts biggest to smallest by the 2nd tuple value
         # which is the post tally
         self.subredditTuple.sort(key=operator.itemgetter(1), reverse=True)
 
         return self.subredditTuple
 
-    
+
     def format_post(self, subreddit, subredditTuple, userList):
         """
         This function formats the data in order to submit it to
@@ -257,11 +243,11 @@ class SubredditAnalysis(object):
 
         return text
 
-    
+
     def submit_post(self, subreddit, text):
         """
         This function submits the results to Reddit. It takes
-        two arguments. The first is the subreddit that was 
+        two arguments. The first is the subreddit that was
         targeted for the drilldown. The second is the text for
         the submission thread.
         """
@@ -292,9 +278,6 @@ class SubredditAnalysis(object):
 
             self.logFile.close()
 
-        else:
-            pass
-
 
     def log_err(self, error):
         """
@@ -312,9 +295,6 @@ class SubredditAnalysis(object):
 
             self.logFile.close()
 
-        else:
-            pass
-
 
 if __name__ == "__main__":
     myBot = SubredditAnalysis()
@@ -322,7 +302,7 @@ if __name__ == "__main__":
     # set these to False if you don't want logs
     myBot.infoLogging = True
     myBot.errorLogging = True
-    
+
     # login credentials
     username = ""
     password = ""
@@ -335,20 +315,12 @@ if __name__ == "__main__":
 
     while True:
         # list of subreddits you want to analyze
-        drilldownList = raw_input("Enter the subreddits you wish to target.~/> ").split() 
+        drilldownList = raw_input("Enter the subreddits you wish to target.~/> ").split()
 
         # iterate through the drilldownList to get data
         for subreddit in drilldownList:
-            
-            if(subreddit == "quit"):
-                print "Quitting..."
-                exit(0)
 
-            elif(subreddit == ".quit"):
-                print "Quitting..."
-                exit(0)
-
-            elif(subreddit == 'q'):
+            if(subreddit in ['quit', '.quit', 'q']):
                 print "Quitting..."
                 exit(0)
 
@@ -356,120 +328,81 @@ if __name__ == "__main__":
                 # get the list of users
                 try:
                     userList = myBot.get_users(subreddit)
-                    
-                    for user in userList:
-                        myBot.log_info(user + ',')      
-
-                    myBot.log_info("\n\n")      
 
                 except Exception, e:
                     print e
                     myBot.log_err(e)
-                    exit(1)     
+                    exit(1)
 
                 except HTTPError, e:
                     print e
                     myBot.log_err(e)
-                    
+
                     # wait 10 seconds and try 1 more time
                     # maybe Reddit broke and just needs some time
                     sleep(10)
-                    
+
                     try:
                         userList = myBot.get_users(subreddit)
-                        
-                        for user in userList:
-                            myBot.log_info(user + ',')      
-
-                        myBot.log_info("\n\n")      
 
                     except Exception, e:
                         print e
                         myBot.log_err(e)
-                        exit(1)     
+                        exit(1)
 
-                except KeyboardInterrupt:
-                    print "\nBot process killed."
-                    exit(0)     
+
+                for user in userList:
+                    myBot.log_info(user + ',')
+
+                myBot.log_info("\n\n")
+
 
                 try:
                     # get the list of subreddits
                     subredditList = myBot.get_subs(userList)
-                    
-                    for sub in subredditList:
-                        myBot.log_info(sub + ',')       
-
-                    myBot.log_info("\n\n")      
 
                 except Exception, e:
                     print e
                     myBot.log_err(e)
-                    exit(1)     
+                    exit(1)
 
                 except HTTPError, e:
                     print e
                     myBot.log_err(e)
-                    sleep(10)       
+                    sleep(10)
 
                     try:
                         subredditList = myBot.get_subs(userList)
-                        
-                        for sub in subredditList:
-                            myBot.log_info(sub + ',')       
-
-                        myBot.log_info("\n\n")      
 
                     except Exception, e:
                         print e
                         myBot.log_err(e)
-                        exit(1)     
+                        exit(1)
 
-                except KeyboardInterrupt:
-                    print "\nBot process killed."
-                    exit(0)     
+                for sub in subredditList:
+                    myBot.log_info(sub + ',')
 
-                
+                myBot.log_info("\n\n")
+
+
                 try:
                     # get the list of tuples
                     subredditTuple = myBot.create_tuples(subreddit, subredditList)
-                    
+
                     for item in subredditTuple:
                         myBot.log_info(item)
-                        myBot.log_info(',')     
+                        myBot.log_info(',')
 
-                    myBot.log_info("\n\n")      
+                    myBot.log_info("\n\n")
 
-                except Exception, e:
-                    print e
-                    myBot.log_err(e)
-                    exit(1)     
-
-                except KeyboardInterrupt:
-                    print "\nBot process killed."
-                    exit(0)     
-
-                try:
                     # format the data for Reddit
                     text = myBot.format_post(subreddit, subredditTuple, userList)
-                
-                except Exception, e:
-                    print e
-                    myBot.log_err(e)
-                    exit(1)     
 
-                except KeyboardInterrupt:
-                    print "\nBot process killed."
-                    exit(0)     
-
-                try:
                     # submit the post for Reddit
-                    myBot.submit_post(subreddit, text)      
-
+                    myBot.submit_post(subreddit, text)
                 except Exception, e:
                     print e
                     myBot.log_err(e)
-                    exit(1)     
+                    exit(1)
 
-                except KeyboardInterrupt:
-                    print "\nBot process killed."
-                    exit(0)
+
