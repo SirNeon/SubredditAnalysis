@@ -329,11 +329,6 @@ if __name__ == "__main__":
                 try:
                     userList = myBot.get_users(subreddit)
 
-                    for user in userList:
-                        myBot.log_info(user + ',')
-
-                    myBot.log_info("\n\n")
-
                 except Exception, e:
                     print e
                     myBot.log_err(e)
@@ -350,24 +345,21 @@ if __name__ == "__main__":
                     try:
                         userList = myBot.get_users(subreddit)
 
-                        for user in userList:
-                            myBot.log_info(user + ',')
-
-                        myBot.log_info("\n\n")
-
                     except Exception, e:
                         print e
                         myBot.log_err(e)
                         exit(1)
 
+
+                for user in userList:
+                    myBot.log_info(user + ',')
+
+                myBot.log_info("\n\n")
+
+
                 try:
                     # get the list of subreddits
                     subredditList = myBot.get_subs(userList)
-
-                    for sub in subredditList:
-                        myBot.log_info(sub + ',')
-
-                    myBot.log_info("\n\n")
 
                 except Exception, e:
                     print e
@@ -382,15 +374,15 @@ if __name__ == "__main__":
                     try:
                         subredditList = myBot.get_subs(userList)
 
-                        for sub in subredditList:
-                            myBot.log_info(sub + ',')
-
-                        myBot.log_info("\n\n")
-
                     except Exception, e:
                         print e
                         myBot.log_err(e)
                         exit(1)
+
+                for sub in subredditList:
+                    myBot.log_info(sub + ',')
+
+                myBot.log_info("\n\n")
 
 
                 try:
@@ -403,26 +395,14 @@ if __name__ == "__main__":
 
                     myBot.log_info("\n\n")
 
-                except Exception, e:
-                    print e
-                    myBot.log_err(e)
-                    exit(1)
-
-                try:
                     # format the data for Reddit
                     text = myBot.format_post(subreddit, subredditTuple, userList)
 
-                except Exception, e:
-                    print e
-                    myBot.log_err(e)
-                    exit(1)
-
-                try:
                     # submit the post for Reddit
                     myBot.submit_post(subreddit, text)
-
                 except Exception, e:
                     print e
                     myBot.log_err(e)
                     exit(1)
+
 
