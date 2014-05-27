@@ -360,10 +360,6 @@ if __name__ == "__main__":
                         myBot.log_err(e)
                         exit(1)
 
-                except KeyboardInterrupt:
-                    print "\nBot process killed."
-                    exit(0)
-
                 try:
                     # get the list of subreddits
                     subredditList = myBot.get_subs(userList)
@@ -396,10 +392,6 @@ if __name__ == "__main__":
                         myBot.log_err(e)
                         exit(1)
 
-                except KeyboardInterrupt:
-                    print "\nBot process killed."
-                    exit(0)
-
 
                 try:
                     # get the list of tuples
@@ -416,10 +408,6 @@ if __name__ == "__main__":
                     myBot.log_err(e)
                     exit(1)
 
-                except KeyboardInterrupt:
-                    print "\nBot process killed."
-                    exit(0)
-
                 try:
                     # format the data for Reddit
                     text = myBot.format_post(subreddit, subredditTuple, userList)
@@ -428,10 +416,6 @@ if __name__ == "__main__":
                     print e
                     myBot.log_err(e)
                     exit(1)
-
-                except KeyboardInterrupt:
-                    print "\nBot process killed."
-                    exit(0)
 
                 try:
                     # submit the post for Reddit
@@ -442,6 +426,3 @@ if __name__ == "__main__":
                     myBot.log_err(e)
                     exit(1)
 
-                except KeyboardInterrupt:
-                    print "\nBot process killed."
-                    exit(0)
