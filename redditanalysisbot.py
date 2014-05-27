@@ -107,8 +107,6 @@ class SubredditAnalysis(object):
                 self.authorList.append(author)
                 print "%d users found up to thread (%d / %d)." % (len(self.authorList), self.submissionCount, self.scrapeLimit)
 
-            else:
-                pass
 
             # load more comments
             submission.replace_more_comments(limit=None, threshold=0)
@@ -125,9 +123,6 @@ class SubredditAnalysis(object):
                 if cauthor not in self.authorList:
                     self.authorList.append(cauthor)
                     print "%d users found up to thread (%d / %d)." % (len(self.authorList), self.submissionCount, self.scrapeLimit)
-
-                else:
-                    continue
 
         return self.authorList
 
@@ -180,16 +175,10 @@ class SubredditAnalysis(object):
                     self.counter[csubreddit] += 1
                     self.userDone.append(csubreddit)
 
-                else:
-                    pass
-
                 # add the ones that aren't kept in the list
                 # to the list of subreddits
                 if((csubreddit not in self.subredditList) & (csubreddit not in self.banList)):
                     self.subredditList.append(csubreddit)
-
-                else:
-                    continue
 
         return self.subredditList
 
@@ -216,9 +205,6 @@ class SubredditAnalysis(object):
             self.intCounter = int(self.counter[item])
             if((item.lower() != subreddit.lower()) & (self.intCounter >= 10)):
                 self.subredditTuple.append((item, self.intCounter))
-
-            else:
-                pass
 
         # sorts biggest to smallest by the 2nd tuple value
         # which is the post tally
@@ -292,9 +278,6 @@ class SubredditAnalysis(object):
 
             self.logFile.close()
 
-        else:
-            pass
-
 
     def log_err(self, error):
         """
@@ -311,9 +294,6 @@ class SubredditAnalysis(object):
             self.logFile.write("\n" + str(error))
 
             self.logFile.close()
-
-        else:
-            pass
 
 
 if __name__ == "__main__":
