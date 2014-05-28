@@ -60,14 +60,8 @@ class SubredditAnalysis(object):
         self.client = praw.Reddit(user_agent=self.useragent)
         print "Logging in..."
 
-        try:
-            self.client.login(username, password)
-            print "Login successful."
-
-        except (praw.errors.InvalidUser, praw.errors.InvalidUserPass) as e:
-            print e
-            self.log_err(e)
-            exit(1)
+        self.client.login(username, password)
+        print "Login successful."
 
 
     def get_users(self, subreddit):
@@ -96,13 +90,7 @@ class SubredditAnalysis(object):
             except AttributeError:
                 continue
 
-            try:
-                self.tally_karma(i, submitter, submission)
-
-            except AttributeError, e:
-                print str(e) + " Failed to tally karma."
-                self.log_err(e)
-                exit(1)
+            self.tally_karma(i, submitter, submission)
 
             # load more comments
             submission.replace_more_comments(limit=None, threshold=0)
@@ -117,13 +105,7 @@ class SubredditAnalysis(object):
                 except AttributeError:
                     continue
 
-                try:
-                    self.tally_karma(i, commenter, comment)
-
-                except AttributeError, e:
-                    print str(e) + " Failed to tally karma."
-                    self.log_err(e)
-                    exit(1)
+                self.tally_karma(i, commenter, comment)
 
         return self.userDict
 
@@ -142,11 +124,11 @@ class SubredditAnalysis(object):
             print "%d users found up to thread (%d / %d)." % (len(self.userDict), i + 1, self.scrapeLimit)
 
         # tally upvoted comments (default score = 1)
-        if content.score > 3:
+        if content.score > 1:
             self.userDict[user] += content.score
 
         # tally downvoted comments
-        if content.score < -1:
+        if content.score < 0:
             self.userDict[user] += content.score
 
 
@@ -212,7 +194,9 @@ class SubredditAnalysis(object):
         This function takes 2 arguments, the first which
         is the subreddit that is being targeted for the drilldown.
         The second is the list of subreddits which will be put
-        into tuples for storage. It returns a list of tuples.
+        into tuples for storage. It returns a list of tuples that
+        contains the subreddit, the overlapping users, and their
+        net karma.
         """
 
         print "Creating tuples..."
@@ -340,7 +324,13 @@ if __name__ == "__main__":
 
     print "Type \"quit\", \".quit\", or \'q\' to exit the program."
 
-    myBot.login(username, password)
+    try:
+        myBot.login(username, password)
+
+    except (praw.errors.InvalidUser, praw.errors.InvalidUserPass) as e:
+            print e
+            self.log_err(e)
+            exit(1)
 
     while True:
         # list of subreddits you want to analyze
