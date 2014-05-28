@@ -128,7 +128,7 @@ class SubredditAnalysis(object):
             self.userDict[user] += content.score
 
         # tally downvoted comments
-        if content.score < 0:
+        if content.score < 1:
             self.userDict[user] += content.score
 
 
