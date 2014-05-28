@@ -17,10 +17,10 @@ class SubredditAnalysis(object):
 
         # maximum threads to crawl. Reddit doesn't
         # like it when you go over 1000
-        self.scrapeLimit = 1000
+        self.scrapeLimit = 25
 
         # post drilldown to this subreddit
-        self.post_to = "SubredditAnalysis"
+        self.post_to = "redditanalysis"
 
         self.useragent = "Reddit Analysis Bot by /u/SirNeon"
 
@@ -85,10 +85,10 @@ class SubredditAnalysis(object):
         submissions = self.client.get_subreddit(subreddit).get_hot(limit=self.scrapeLimit)
 
         # userbase in the selected subreddit to be scanned
-        self.userList = []
+        self.userDict = {}
 
         # get the thread creator and if he's not
-        # in the userList then add him there
+        # in the userDict then add him there
         for i, submission in enumerate(submissions):
             try:
                 submitter = str(submission.author)
@@ -96,32 +96,61 @@ class SubredditAnalysis(object):
             except AttributeError:
                 continue
 
-            # make sure that users don't get added multiple times
-            if submitter not in self.userList:
-                self.userList.append(submitter)
-                print "%d users found up to thread (%d / %d)." % (len(self.userList), i + 1, self.scrapeLimit)
+            try:
+                self.tally_karma(i, submitter, submission)
 
+            except AttributeError, e:
+                print str(e) + " Failed to tally karma."
+                self.log_err(e)
+                exit(1)
 
             # load more comments
             submission.replace_more_comments(limit=None, threshold=0)
 
             # get the comment authors and append
-            # them to userList for scanning
+            # them to userDict for scanning
             for comment in praw.helpers.flatten_tree(submission.comments):
+
                 try:
                     commenter = str(comment.author)
 
                 except AttributeError:
                     continue
 
-                if commenter not in self.userList:
-                    self.userList.append(commenter)
-                    print "%d users found up to thread (%d / %d)." % (len(self.userList), i + 1, self.scrapeLimit)
+                try:
+                    self.tally_karma(i, commenter, comment)
 
-        return self.userList
+                except AttributeError, e:
+                    print str(e) + " Failed to tally karma."
+                    self.log_err(e)
+                    exit(1)
+
+        return self.userDict
 
 
-    def get_subs(self, userList):
+    def tally_karma(self, i, user, content):
+        """
+        This function tallies up a user's karma in the drilldown
+        subreddit. It takes three arguments: the iteratable, 
+        the user, and the comment/submission. This data will be
+        used to help show if the overlapping users of a subreddit 
+        are trolling or not.
+        """
+        # initialize dict key if necessary
+        if user not in self.userDict:
+            self.userDict[user] = 0
+            print "%d users found up to thread (%d / %d)." % (len(self.userDict), i + 1, self.scrapeLimit)
+
+        # tally upvoted comments (default score = 1)
+        if content.score > 3:
+            self.userDict[user] += content.score
+
+        # tally downvoted comments
+        if content.score < -1:
+            self.userDict[user] += content.score
+
+
+    def get_subs(self, userDict):
         """
         This function uses the list collected by get_users()
         in order to find the crossover subreddits. It takes 1
@@ -134,14 +163,14 @@ class SubredditAnalysis(object):
         print "Scanning for overlapping subreddits..."
 
         # list of overlapping subreddits
-        subredditList = []
+        subredditDict = {}
 
         # keeps count on overlapping users
         self.counter = Counter()
 
         # iterate through the list of users in order
         # to get their comments for crossreferencing
-        for i, user in enumerate(userList):
+        for i, user in enumerate(userDict):
             try:
                 comments = self.client.get_redditor(user).get_comments('all')
 
@@ -154,12 +183,13 @@ class SubredditAnalysis(object):
             self.userDone = []
 
             # keeps track of how many users are remaining
-            usersLeft = len(userList) - i - 1
+            usersLeft = len(userDict) - i - 1
 
-            print "(%d / %d) users remaining." % (usersLeft, len(userList))
+            print "(%d / %d) users remaining." % (usersLeft, len(userDict))
 
             for comment in comments:
                 csubreddit = str(comment.subreddit)
+
                 if csubreddit not in self.userDone:
                     # keep tabs on how many
                     # users post to a subreddit
@@ -168,13 +198,16 @@ class SubredditAnalysis(object):
 
                 # add the ones that aren't kept in the list
                 # to the list of subreddits
-                if((csubreddit not in subredditList) & (csubreddit not in self.banList)):
-                    subredditList.append(csubreddit)
+                if csubreddit not in subredditDict:
+                    subredditDict[csubreddit] = 0
 
-        return subredditList
+                    if csubreddit not in self.banList:
+                        subredditDict[csubreddit] += userDict[user]
+
+        return subredditDict
 
 
-    def create_tuples(self, subreddit, subredditList):
+    def create_tuples(self, subreddit, subredditDict):
         """
         This function takes 2 arguments, the first which
         is the subreddit that is being targeted for the drilldown.
@@ -189,13 +222,17 @@ class SubredditAnalysis(object):
 
         # create a bunch of tuples and adds them to a list
         # to neatly store the collected data for future sorting
-        for item in subredditList:
+        for sub in subredditDict:
+            overlapCounter = int(self.counter[sub])
+            netKarma = int(subredditDict[sub])
+
+
             # avoids including posts made
             # in the selected subreddit
             # also exclude crossovers with less than 10 posters
-            self.intCounter = int(self.counter[item])
-            if((item.lower() != subreddit.lower()) & (self.intCounter >= 10)):
-                self.subredditTuple.append((item, self.intCounter))
+            if sub.lower() != subreddit.lower():
+                if overlapCounter >= 10:
+                    self.subredditTuple.append((sub, overlapCounter, netKarma))
 
         # sorts biggest to smallest by the 2nd tuple value
         # which is the post tally
@@ -204,7 +241,7 @@ class SubredditAnalysis(object):
         return self.subredditTuple
 
 
-    def format_post(self, subreddit, subredditTuple, userList):
+    def format_post(self, subreddit, subredditTuple, userDict):
         """
         This function formats the data in order to submit it to
         Reddit. It takes 3 arguments. The first is the subreddit
@@ -218,9 +255,9 @@ class SubredditAnalysis(object):
 
         # make a table
         self.bodyStart = "## /r/%s Drilldown\n\n" % subreddit
-        self.bodyStart += "Of %d Users Found:\n\n" % len(userList)
-        self.bodyStart += "| Subreddit | Overlapping users |\n"
-        self.bodyStart += "|:------|------:|\n"
+        self.bodyStart += "Of %d Users Found:\n\n" % len(userDict)
+        self.bodyStart += "| Subreddit | Overlapping users | Net Karma |\n"
+        self.bodyStart += "|:------|------:|------:|\n"
 
         self.bodyContent = ""
 
@@ -228,7 +265,8 @@ class SubredditAnalysis(object):
         for i in range(0, len(subredditTuple)):
             sub = "".join(subredditTuple[i][0])
             overlap = "".join(str(subredditTuple[i][1]))
-            self.bodyContent += "|/r/%s|%s|\n" % (sub, overlap)
+            karma = "".join(str(subredditTuple[i][2]))
+            self.bodyContent += "|/r/%s|%s|%s|\n" % (sub, overlap, karma)
 
         text = self.bodyStart + self.bodyContent
 
@@ -318,7 +356,7 @@ if __name__ == "__main__":
             else:
                 # get the list of users
                 try:
-                    userList = myBot.get_users(subreddit)
+                    userDict = myBot.get_users(subreddit)
 
                 except Exception, e:
                     print e
@@ -334,7 +372,7 @@ if __name__ == "__main__":
                     sleep(10)
 
                     try:
-                        userList = myBot.get_users(subreddit)
+                        userDict = myBot.get_users(subreddit)
 
                     except Exception, e:
                         print e
@@ -342,15 +380,15 @@ if __name__ == "__main__":
                         exit(1)
 
 
-                for user in userList:
-                    myBot.log_info(user + ',')
+                for user in userDict:
+                    myBot.log_info(user + ':' + str(userDict[user]) + ',')
 
                 myBot.log_info("\n\n")
 
 
                 try:
                     # get the list of subreddits
-                    subredditList = myBot.get_subs(userList)
+                    subredditDict = myBot.get_subs(userDict)
 
                 except Exception, e:
                     print e
@@ -363,22 +401,22 @@ if __name__ == "__main__":
                     sleep(10)
 
                     try:
-                        subredditList = myBot.get_subs(userList)
+                        subredditDict = myBot.get_subs(userDict)
 
                     except Exception, e:
                         print e
                         myBot.log_err(e)
                         exit(1)
 
-                for sub in subredditList:
-                    myBot.log_info(sub + ',')
+                for sub in subredditDict:
+                    myBot.log_info(sub + ':' + str(subredditDict[sub]) + ',')
 
                 myBot.log_info("\n\n")
 
 
                 try:
                     # get the list of tuples
-                    subredditTuple = myBot.create_tuples(subreddit, subredditList)
+                    subredditTuple = myBot.create_tuples(subreddit, subredditDict)
 
                     for item in subredditTuple:
                         myBot.log_info(item)
@@ -387,7 +425,7 @@ if __name__ == "__main__":
                     myBot.log_info("\n\n")
 
                     # format the data for Reddit
-                    text = myBot.format_post(subreddit, subredditTuple, userList)
+                    text = myBot.format_post(subreddit, subredditTuple, userDict)
 
                     # submit the post for Reddit
                     myBot.submit_post(subreddit, text)
@@ -395,5 +433,3 @@ if __name__ == "__main__":
                     print e
                     myBot.log_err(e)
                     exit(1)
-
-
