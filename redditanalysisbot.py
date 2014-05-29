@@ -123,12 +123,11 @@ class SubredditAnalysis(object):
             self.userDict[user] = 0
             print "%d users found up to thread (%d / %d)." % (len(self.userDict), i + 1, self.scrapeLimit)
 
-        # tally upvoted comments (default score = 1)
-        if content.score > 1:
-            self.userDict[user] += content.score
+        # default score = 1
+        if content.score == 1:
+            pass
 
-        # tally downvoted comments
-        if content.score < 1:
+        else:
             self.userDict[user] += content.score
 
 
@@ -181,9 +180,8 @@ class SubredditAnalysis(object):
                 # add the ones that aren't kept in the list
                 # to the list of subreddits
                 if csubreddit not in subredditDict:
-                    subredditDict[csubreddit] = 0
-
                     if csubreddit not in self.banList:
+                        subredditDict[csubreddit] = 0    
                         subredditDict[csubreddit] += userDict[user]
 
         return subredditDict
@@ -240,7 +238,7 @@ class SubredditAnalysis(object):
         # make a table
         self.bodyStart = "## /r/%s Drilldown\n\n" % subreddit
         self.bodyStart += "Of %d Users Found:\n\n" % len(userDict)
-        self.bodyStart += "| Subreddit | Overlapping users | Net Karma |\n"
+        self.bodyStart += "| Subreddit | Overlapping users | Net Karma (Beta Testing) |\n"
         self.bodyStart += "|:------|------:|------:|\n"
 
         self.bodyContent = ""
@@ -271,7 +269,7 @@ class SubredditAnalysis(object):
         self.mySubreddit = self.client.get_subreddit(self.post_to)
 
         # thread title
-        title = "/r/%s Drilldown %s" % (subreddit, datetime.now().strftime("%B %Y"))
+        title = "/r/%s Drilldown %s (Public Beta Edition)" % (subreddit, datetime.now().strftime("%B %Y"))
 
         # finally submit it
         self.mySubreddit.submit(title, text)
@@ -327,7 +325,7 @@ if __name__ == "__main__":
     try:
         myBot.login(username, password)
 
-    except (praw.errors.InvalidUser, praw.errors.InvalidUserPass) as e:
+    except (praw.errors.InvalidUser, praw.errors.InvalidUserPass, HTTPError) as e:
             print e
             self.log_err(e)
             exit(1)
