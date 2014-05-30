@@ -20,16 +20,29 @@ class SubredditAnalysis(object):
 
         # maximum threads to crawl. Reddit doesn't
         # like it when you go over 1000
-        self.scrapeLimit = 25
+        self.scrapeLimit = 1000
 
         # post drilldown to this subreddit
         self.post_to = "redditanalysis"
 
         self.useragent = "Reddit Analysis Bot by /u/SirNeon"
 
+        # keep count of how many attempts have been made
+        # to get a list of users for the target subreddit
+        self.userRetry = 0
+
+        # keep count of how many attempts have been made
+        # to get a list of subreddits for the target subreddit
+        self.subRetry = 0
+
+        # keep count of how many attempts have been made
+        # to submit a post to Reddit
+        self.submitRetry = 0
+
         # optional logging
-        self.infoLogging = False
-        self.errorLogging = False
+        self.errorLogging = True
+        self.infoLogging = True
+        self.postLogging = True
 
         # I've banned defaults and former defaults since
         # there's bound to be overlap with those due to
@@ -190,8 +203,8 @@ class SubredditAnalysis(object):
 
                 # this block produces crazy
                 # results and I don't know why
-                if csubreddit not in self.banList:
-                    subredditDict[csubreddit] += userDict[user]
+#                if csubreddit not in self.banList:
+#                    subredditDict[csubreddit] += userDict[user]
 
         return subredditDict
 
@@ -259,6 +272,10 @@ class SubredditAnalysis(object):
             karma = "".join(str(subredditTuple[i][2]))
             self.bodyContent += "|/r/%s|%s|%s|\n" % (sub, overlap, karma)
 
+            if len(self.bodyStart + self.bodyContent) >= 9900:
+                # so the table doesn't get too big to post
+                break
+
         text = self.bodyStart + self.bodyContent
 
         return text
@@ -283,18 +300,20 @@ class SubredditAnalysis(object):
         # finally submit it
         self.mySubreddit.submit(title, text)
 
-
-    def log_info(self, info):
+    
+    def log_err(self, error):
         """
-        This is for logging raw data in case you want to.
+        This is for logging errors.
         """
 
-        if(self.infoLogging):
+        if(self.errorLogging):
             self.logDate = str(datetime.now().strftime("%Y-%m-%d"))
-            self.logName = "SubredditAnalysis_%s.txt" % (self.logDate)
+            self.logName = "SubredditAnalysis_logerr_%s.txt" % (self.logDate)
             self.logFile = open(self.logName, 'a')
+            self.logTime = str(datetime.now().strftime("%Y-%m-%d %H:%M"))
 
-            self.logFile.write(str(info))
+            self.logFile.write('\n\n' + self.logTime)
+            self.logFile.write("\n" + str(error))
 
             self.logFile.close()
 
@@ -316,12 +335,45 @@ class SubredditAnalysis(object):
             self.logFile.close()
 
 
+    def log_info(self, info):
+        """
+        This is for logging raw data in case you want to.
+        """
+
+        if(self.infoLogging):
+            self.logDate = str(datetime.now().strftime("%Y-%m-%d"))
+            self.logName = "SubredditAnalysis_%s.txt" % (self.logDate)
+            self.logFile = open(self.logName, 'a')
+
+            self.logFile.write(str(info))
+
+            self.logFile.close()
+
+    
+    def log_post(self, subreddit, post):
+        """
+        In the event that the bot can not submit a post to
+        Reddit, this function will write that post to a text file
+        so that your time isn't wasted. It takes 2 arguments: the
+        drilldown subreddit and the post.
+        """
+
+        if(self.postLogging):
+            self.logName = "%s_results.txt" % subreddit
+            self.postFile = open(self.logName, 'a')
+
+            self.postFile.write(str(post))
+
+            self.postFile.close()
+
+
 if __name__ == "__main__":
     myBot = SubredditAnalysis()
 
     # set these to False if you don't want logs
-    myBot.infoLogging = True
     myBot.errorLogging = True
+    myBot.infoLogging = True
+    myBot.postLogging = True
 
     # login credentials
     username = ""
@@ -354,28 +406,36 @@ if __name__ == "__main__":
                 # get the list of users
                 try:
                     userDict = myBot.get_users(subreddit)
-
-                except Exception, e:
-                    print e
-                    myBot.log_err(e)
-                    exit(1)
+                    myBot.userRetry = 0
 
                 except HTTPError, e:
                     print e
                     myBot.log_err(e)
 
-                    # wait 10 seconds and try 1 more time
-                    # maybe Reddit broke and just needs some time
-                    sleep(10)
+                    # try this 3 times
+                    while myBot.userRetry <= 3:
+                        # wait 5 minutes and try again
+                        # maybe Reddit broke and just needs some time
+                        print "Waiting 5 minutes to try again..."
+                        sleep(300)
 
-                    try:
-                        userDict = myBot.get_users(subreddit)
+                        try:
+                            userDict = myBot.get_users(subreddit)
+                            break
 
-                    except Exception, e:
-                        print e
-                        myBot.log_err(e)
+                        except Exception, e:
+                            print e
+                            myBot.log_err(e)
+                            myBot.userRetry += 1
+                    
+                    if myBot.userRetry > 3:
+                        print "Failed to get users."
                         exit(1)
 
+                except Exception, e:
+                    print e
+                    myBot.log_err(e)
+                    exit(1)
 
                 for user in userDict:
                     myBot.log_info(user + ':' + str(userDict[user]) + ',')
@@ -386,24 +446,36 @@ if __name__ == "__main__":
                 try:
                     # get the list of subreddits
                     subredditDict = myBot.get_subs(userDict)
+                    myBot.subRetry = 0
+
+                except HTTPError, e:
+                    print e
+                    myBot.log_err(e)
+
+                    while myBot.subRetry <= 3:
+
+                        # wait 5 minutes and try again
+                        # maybe Reddit broke and just needs some time
+                        print "Waiting 5 minutes to try again..."
+                        sleep(300)
+
+                        try:
+                            subredditDict = myBot.get_subs(subreddit)
+                            break
+
+                        except Exception, e:
+                            print e
+                            myBot.log_err(e)
+                            myBot.subRetry += 1
+                    
+                    if myBot.subRetry > 3:
+                        print "Failed to get overlapping subreddits."
+                        exit(1)
 
                 except Exception, e:
                     print e
                     myBot.log_err(e)
                     exit(1)
-
-                except HTTPError, e:
-                    print e
-                    myBot.log_err(e)
-                    sleep(10)
-
-                    try:
-                        subredditDict = myBot.get_subs(userDict)
-
-                    except Exception, e:
-                        print e
-                        myBot.log_err(e)
-                        exit(1)
 
                 for sub in subredditDict:
                     myBot.log_info(sub + ':' + str(subredditDict[sub]) + ',')
@@ -424,9 +496,41 @@ if __name__ == "__main__":
                     # format the data for Reddit
                     text = myBot.format_post(subreddit, subredditTuple, userDict)
 
-                    # submit the post for Reddit
-                    myBot.submit_post(subreddit, text)
                 except Exception, e:
                     print e
                     myBot.log_err(e)
+                    exit(1)
+
+                try:
+                    # submit the post for Reddit
+                    myBot.submit_post(subreddit, text)
+                    myBot.submitRetry = 0
+
+                except HTTPError, e:
+                    print e
+                    myBot.log_err(e)
+
+                    while myBot.submitRetry <= 3:
+
+                        print "Waiting 5 minutes to try again..."
+                        sleep(300)
+
+                        try:
+                            myBot.submit_post(subreddit, text)
+                            break
+
+                        except Exception, e:
+                            print e
+                            myBot.log_err(e)
+                            myBot.submitRetry += 1
+
+                    if myBot.submitRetry > 3:
+                        print "Failed to submit post."
+                        myBot.log_post(subreddit, text)
+                        exit(1)
+                
+                except Exception, e:
+                    print e
+                    myBot.log_err(e)
+                    myBot.log_post(subreddit, text)
                     exit(1)
