@@ -388,7 +388,7 @@ if __name__ == "__main__":
                     exit(1)
 
                 for user in userList:
-                    myBot.log_info(user + ':' + str(userList[user]) + ',')
+                    myBot.log_info(user + ',')
 
                 myBot.log_info("\n\n")
 
@@ -428,7 +428,7 @@ if __name__ == "__main__":
                     exit(1)
 
                 for sub in subredditList:
-                    myBot.log_info(sub + ':' + str(subredditList[sub]) + ',')
+                    myBot.log_info(sub + ',')
 
                 myBot.log_info("\n\n")
 
