@@ -306,7 +306,7 @@ if __name__ == "__main__":
 
     except (praw.errors.InvalidUser, praw.errors.InvalidUserPass, HTTPError) as e:
             print e
-            self.log_err(e)
+            myBot.log_err(e)
             exit(1)
 
     while True:
