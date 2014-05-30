@@ -24,6 +24,18 @@ class SubredditAnalysis(object):
 
         self.useragent = "Reddit Analysis Bot by /u/SirNeon"
 
+        # keep count of how many attempts have been made
+        # to get a list of users for the target subreddit
+        self.userRetry = 0
+
+        # keep count of how many attempts have been made
+        # to get a list of subreddits for the target subreddit
+        self.subRetry = 0
+
+        # keep count of how many attempts have been made
+        # to submit a post to Reddit
+        self.submitRetry = 0
+
         # optional logging
         self.errorLogging = True
         self.infoLogging = True
