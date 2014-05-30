@@ -300,23 +300,6 @@ class SubredditAnalysis(object):
         # finally submit it
         self.mySubreddit.submit(title, text)
 
-    
-    def log_err(self, error):
-        """
-        This is for logging errors.
-        """
-
-        if(self.errorLogging):
-            self.logDate = str(datetime.now().strftime("%Y-%m-%d"))
-            self.logName = "SubredditAnalysis_logerr_%s.txt" % (self.logDate)
-            self.logFile = open(self.logName, 'a')
-            self.logTime = str(datetime.now().strftime("%Y-%m-%d %H:%M"))
-
-            self.logFile.write('\n\n' + self.logTime)
-            self.logFile.write("\n" + str(error))
-
-            self.logFile.close()
-
 
     def log_err(self, error):
         """
