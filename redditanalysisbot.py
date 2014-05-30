@@ -60,14 +60,8 @@ class SubredditAnalysis(object):
         self.client = praw.Reddit(user_agent=self.useragent)
         print "Logging in..."
 
-        try:
-            self.client.login(username, password)
-            print "Login successful."
-
-        except (praw.errors.InvalidUser, praw.errors.InvalidUserPass) as e:
-            print e
-            self.log_err(e)
-            exit(1)
+        self.client.login(username, password)
+        print "Login successful."
 
 
     def get_users(self, subreddit):
@@ -179,7 +173,8 @@ class SubredditAnalysis(object):
         This function takes 2 arguments, the first which
         is the subreddit that is being targeted for the drilldown.
         The second is the list of subreddits which will be put
-        into tuples for storage. It returns a list of tuples.
+        into tuples for storage. It returns a list of tuples that
+        contains the subreddit and the number overlapping users.
         """
 
         print "Creating tuples..."
@@ -229,6 +224,10 @@ class SubredditAnalysis(object):
             sub = "".join(subredditTuple[i][0])
             overlap = "".join(str(subredditTuple[i][1]))
             self.bodyContent += "|/r/%s|%s|\n" % (sub, overlap)
+
+            if len(self.bodyStart + self.bodyContent) >= 9900:
+                # so the table doesn't get too big to post
+                break
 
         text = self.bodyStart + self.bodyContent
 
@@ -291,7 +290,7 @@ if __name__ == "__main__":
     myBot = SubredditAnalysis()
 
     # set these to False if you don't want logs
-    myBot.infoLogging = True
+    myBot.infoLogging = False
     myBot.errorLogging = True
 
     # login credentials
@@ -302,7 +301,13 @@ if __name__ == "__main__":
 
     print "Type \"quit\", \".quit\", or \'q\' to exit the program."
 
-    myBot.login(username, password)
+    try:
+        myBot.login(username, password)
+
+    except (praw.errors.InvalidUser, praw.errors.InvalidUserPass, HTTPError) as e:
+            print e
+            self.log_err(e)
+            exit(1)
 
     while True:
         # list of subreddits you want to analyze
@@ -320,10 +325,36 @@ if __name__ == "__main__":
                 try:
                     userList = myBot.get_users(subreddit)
 
+                except HTTPError, e:
+                    print e
+                    myBot.log_err(e)
+
+                    # wait 10 seconds and try 1 more time
+                    # maybe Reddit broke and just needs some time
+                    sleep(10)
+
+                    try:
+                        userList = myBot.get_users(subreddit)
+
+                    except Exception, e:
+                        print e
+                        myBot.log_err(e)
+                        exit(1)
+
                 except Exception, e:
                     print e
                     myBot.log_err(e)
                     exit(1)
+
+                for user in userList:
+                    myBot.log_info(user + ',')
+
+                myBot.log_info("\n\n")
+
+
+                try:
+                    # get the list of subreddits
+                    subredditList = myBot.get_subs(userList)
 
                 except HTTPError, e:
                     print e
@@ -341,34 +372,10 @@ if __name__ == "__main__":
                         myBot.log_err(e)
                         exit(1)
 
-
-                for user in userList:
-                    myBot.log_info(user + ',')
-
-                myBot.log_info("\n\n")
-
-
-                try:
-                    # get the list of subreddits
-                    subredditList = myBot.get_subs(userList)
-
                 except Exception, e:
                     print e
                     myBot.log_err(e)
                     exit(1)
-
-                except HTTPError, e:
-                    print e
-                    myBot.log_err(e)
-                    sleep(10)
-
-                    try:
-                        subredditList = myBot.get_subs(userList)
-
-                    except Exception, e:
-                        print e
-                        myBot.log_err(e)
-                        exit(1)
 
                 for sub in subredditList:
                     myBot.log_info(sub + ',')
@@ -395,5 +402,3 @@ if __name__ == "__main__":
                     print e
                     myBot.log_err(e)
                     exit(1)
-
-
