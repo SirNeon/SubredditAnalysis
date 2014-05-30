@@ -25,8 +25,9 @@ class SubredditAnalysis(object):
         self.useragent = "Reddit Analysis Bot by /u/SirNeon"
 
         # optional logging
-        self.infoLogging = False
-        self.errorLogging = False
+        self.errorLogging = True
+        self.infoLogging = True
+        self.postLogging = True
 
         # I've banned defaults and former defaults since
         # there's bound to be overlap with those due to
@@ -174,7 +175,8 @@ class SubredditAnalysis(object):
         is the subreddit that is being targeted for the drilldown.
         The second is the list of subreddits which will be put
         into tuples for storage. It returns a list of tuples that
-        contains the subreddit and the number overlapping users.
+        contains the subreddit, the overlapping users, and their
+        net karma.
         """
 
         print "Creating tuples..."
@@ -253,6 +255,23 @@ class SubredditAnalysis(object):
         # finally submit it
         self.mySubreddit.submit(title, text)
 
+    
+    def log_err(self, error):
+        """
+        This is for logging errors.
+        """
+
+        if(self.errorLogging):
+            self.logDate = str(datetime.now().strftime("%Y-%m-%d"))
+            self.logName = "SubredditAnalysis_logerr_%s.txt" % (self.logDate)
+            self.logFile = open(self.logName, 'a')
+            self.logTime = str(datetime.now().strftime("%Y-%m-%d %H:%M"))
+
+            self.logFile.write('\n\n' + self.logTime)
+            self.logFile.write("\n" + str(error))
+
+            self.logFile.close()
+    
 
     def log_info(self, info):
         """
@@ -269,29 +288,30 @@ class SubredditAnalysis(object):
             self.logFile.close()
 
 
-    def log_err(self, error):
+    def log_post(self, subreddit, post):
         """
-        This is for logging errors.
+        In the event that the bot can not submit a post to
+        Reddit, this function will write that post to a text file
+        so that your time isn't wasted. It takes 2 arguments: the
+        drilldown subreddit and the post.
         """
 
-        if(self.errorLogging):
-            self.logDate = str(datetime.now().strftime("%Y-%m-%d"))
-            self.logName = "SubredditAnalysis_logerr_%s.txt" % (self.logDate)
-            self.logFile = open(self.logName, 'a')
-            self.logTime = str(datetime.now().strftime("%Y-%m-%d %H:%M"))
+        if(self.postLogging):
+            self.logName = "%s_results.txt" % subreddit
+            self.postFile = open(self.logName, 'a')
 
-            self.logFile.write('\n\n' + self.logTime)
-            self.logFile.write("\n" + str(error))
+            self.postFile.write(str(post))
 
-            self.logFile.close()
+            self.postFile.close()
 
 
 if __name__ == "__main__":
     myBot = SubredditAnalysis()
 
     # set these to False if you don't want logs
-    myBot.infoLogging = False
+    myBot.infoLogging = True
     myBot.errorLogging = True
+    myBot.postLogging = True
 
     # login credentials
     username = ""
@@ -324,21 +344,30 @@ if __name__ == "__main__":
                 # get the list of users
                 try:
                     userList = myBot.get_users(subreddit)
+                    myBot.userRetry = 0
 
                 except HTTPError, e:
                     print e
                     myBot.log_err(e)
 
-                    # wait 10 seconds and try 1 more time
-                    # maybe Reddit broke and just needs some time
-                    sleep(10)
+                    # try this 3 times
+                    while myBot.userRetry <= 3:
+                        # wait 5 minutes and try again
+                        # maybe Reddit broke and just needs some time
+                        print "Waiting 5 minutes to try again..."
+                        sleep(300)
 
-                    try:
-                        userList = myBot.get_users(subreddit)
+                        try:
+                            userList = myBot.get_users(subreddit)
+                            break
 
-                    except Exception, e:
-                        print e
-                        myBot.log_err(e)
+                        except Exception, e:
+                            print e
+                            myBot.log_err(e)
+                            myBot.userRetry += 1
+                    
+                    if myBot.userRetry > 3:
+                        print "Failed to get users."
                         exit(1)
 
                 except Exception, e:
@@ -347,7 +376,7 @@ if __name__ == "__main__":
                     exit(1)
 
                 for user in userList:
-                    myBot.log_info(user + ',')
+                    myBot.log_info(user + ':' + str(userList[user]) + ',')
 
                 myBot.log_info("\n\n")
 
@@ -355,21 +384,30 @@ if __name__ == "__main__":
                 try:
                     # get the list of subreddits
                     subredditList = myBot.get_subs(userList)
+                    myBot.subRetry = 0
 
                 except HTTPError, e:
                     print e
                     myBot.log_err(e)
 
-                    # wait 10 seconds and try 1 more time
-                    # maybe Reddit broke and just needs some time
-                    sleep(10)
+                    while myBot.subRetry <= 3:
 
-                    try:
-                        userList = myBot.get_subs(subreddit)
+                        # wait 5 minutes and try again
+                        # maybe Reddit broke and just needs some time
+                        print "Waiting 5 minutes to try again..."
+                        sleep(300)
 
-                    except Exception, e:
-                        print e
-                        myBot.log_err(e)
+                        try:
+                            subredditList = myBot.get_subs(subreddit)
+                            break
+
+                        except Exception, e:
+                            print e
+                            myBot.log_err(e)
+                            myBot.subRetry += 1
+                    
+                    if myBot.subRetry > 3:
+                        print "Failed to get overlapping subreddits."
                         exit(1)
 
                 except Exception, e:
@@ -378,7 +416,7 @@ if __name__ == "__main__":
                     exit(1)
 
                 for sub in subredditList:
-                    myBot.log_info(sub + ',')
+                    myBot.log_info(sub + ':' + str(subredditList[sub]) + ',')
 
                 myBot.log_info("\n\n")
 
@@ -396,9 +434,41 @@ if __name__ == "__main__":
                     # format the data for Reddit
                     text = myBot.format_post(subreddit, subredditTuple, userList)
 
-                    # submit the post for Reddit
-                    myBot.submit_post(subreddit, text)
                 except Exception, e:
                     print e
                     myBot.log_err(e)
+                    exit(1)
+
+                try:
+                    # submit the post for Reddit
+                    myBot.submit_post(subreddit, text)
+                    myBot.submitRetry = 0
+
+                except HTTPError, e:
+                    print e
+                    myBot.log_err(e)
+
+                    while myBot.submitRetry <= 3:
+
+                        print "Waiting 5 minutes to try again..."
+                        sleep(300)
+
+                        try:
+                            myBot.submit_post(subreddit, text)
+                            break
+
+                        except Exception, e:
+                            print e
+                            myBot.log_err(e)
+                            myBot.submitRetry += 1
+
+                    if myBot.submitRetry > 3:
+                        print "Failed to submit post."
+                        myBot.log_post(subreddit, text)
+                        exit(1)
+                
+                except Exception, e:
+                    print e
+                    myBot.log_err(e)
+                    myBot.log_post(subreddit, text)
                     exit(1)
