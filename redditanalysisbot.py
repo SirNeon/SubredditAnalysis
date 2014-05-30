@@ -1,5 +1,5 @@
 # known issues:
-# @line 191: karma calculator will produce way too much karma
+# @line 204: karma calculator will produce way too much karma
 
 from collections import Counter
 from datetime import datetime
@@ -203,8 +203,8 @@ class SubredditAnalysis(object):
 
                 # this block produces crazy
                 # results and I don't know why
-#                if csubreddit not in self.banList:
-#                    subredditDict[csubreddit] += userDict[user]
+                if csubreddit not in self.banList:
+                    subredditDict[csubreddit] += userDict[user]
 
         return subredditDict
 
