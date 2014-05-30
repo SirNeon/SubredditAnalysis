@@ -365,7 +365,7 @@ if __name__ == "__main__":
                     sleep(10)
 
                     try:
-                        userList = myBot.get_users(subreddit)
+                        userList = myBot.get_subs(subreddit)
 
                     except Exception, e:
                         print e
