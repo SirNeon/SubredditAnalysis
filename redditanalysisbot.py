@@ -1,7 +1,8 @@
 from collections import Counter
 from datetime import datetime
+import logging
 import operator
-from sys import exit
+from sys import exit, stderr
 from time import sleep
 import praw
 from requests import HTTPError
@@ -166,7 +167,12 @@ class SubredditAnalysis(object):
             print "(%d / %d) users remaining." % (usersLeft, len(userList))
 
             for comment in comments:
-                csubreddit = str(comment.subreddit)
+                try:
+                    csubreddit = str(comment.subreddit)
+
+                except AttributeError:
+                    continue
+
                 if csubreddit not in self.userDone:
                     # keep tabs on how many
                     # users post to a subreddit
@@ -203,7 +209,7 @@ class SubredditAnalysis(object):
             # in the selected subreddit
             # also exclude crossovers with less than 10 posters
             self.intCounter = int(self.counter[item])
-            if((item.lower() != subreddit.lower()) & (self.intCounter >= 10)):
+            if((item.lower() != subreddit.lower()) & (self.intCounter >= 5)):
                 self.subredditTuple.append((item, self.intCounter))
 
         # sorts biggest to smallest by the 2nd tuple value
@@ -274,15 +280,14 @@ class SubredditAnalysis(object):
         """
 
         if(self.errorLogging):
-            self.logDate = str(datetime.now().strftime("%Y-%m-%d"))
-            self.logName = "SubredditAnalysis_logerr_%s.txt" % (self.logDate)
-            self.logFile = open(self.logName, 'a')
-            self.logTime = str(datetime.now().strftime("%Y-%m-%d %H:%M"))
-
-            self.logFile.write('\n\n' + self.logTime)
-            self.logFile.write("\n" + str(error))
-
-            self.logFile.close()
+            logging.basicConfig(
+                filename="SubredditAnalysis_logerr.log", 
+                filemode='a', format="%(asctime)s\nIn "
+                "%(filename)s (%(funcName)s:%(lineno)s): "
+                "%(message)s", datefmt="%Y-%m-%d %H:%M", 
+                level=logging.DEBUG, stream=stderr
+            )
+            logging.debug(str(error) + "\n\n")
     
 
     def log_info(self, info):
