@@ -38,7 +38,6 @@ class SubredditAnalysis(object):
         self.submitRetry = 0
 
         # optional logging
-        self.errorLogging = True
         self.infoLogging = True
         self.postLogging = True
 
@@ -209,7 +208,7 @@ class SubredditAnalysis(object):
             # in the selected subreddit
             # also exclude crossovers with less than 10 posters
             self.intCounter = int(self.counter[item])
-            if((item.lower() != subreddit.lower()) & (self.intCounter >= 5)):
+            if((item.lower() != subreddit.lower()) & (self.intCounter >= 10)):
                 self.subredditTuple.append((item, self.intCounter))
 
         # sorts biggest to smallest by the 2nd tuple value
@@ -272,22 +271,6 @@ class SubredditAnalysis(object):
 
         # finally submit it
         self.mySubreddit.submit(title, text)
-
-    
-    def log_err(self, error):
-        """
-        This is for logging errors.
-        """
-
-        if(self.errorLogging):
-            logging.basicConfig(
-                filename="SubredditAnalysis_logerr.log", 
-                filemode='a', format="%(asctime)s\nIn "
-                "%(filename)s (%(funcName)s:%(lineno)s): "
-                "%(message)s", datefmt="%Y-%m-%d %H:%M", 
-                level=logging.DEBUG, stream=stderr
-            )
-            logging.debug(str(error) + "\n\n")
     
 
     def log_info(self, info):
@@ -326,9 +309,18 @@ if __name__ == "__main__":
     myBot = SubredditAnalysis()
 
     # set these to False if you don't want logs
-    myBot.infoLogging = True
-    myBot.errorLogging = True
+    myBot.infoLogging = False
+    errorLogging = True
     myBot.postLogging = True
+
+    if(errorLogging):
+        logging.basicConfig(
+            filename="SubredditAnalysis_logerr.log", 
+            filemode='a', format="%(asctime)s\nIn "
+            "%(filename)s (%(funcName)s:%(lineno)s): "
+            "%(message)s", datefmt="%Y-%m-%d %H:%M", 
+            level=logging.DEBUG, stream=stderr
+        )
 
     # login credentials
     username = ""
@@ -343,7 +335,7 @@ if __name__ == "__main__":
 
     except (praw.errors.InvalidUser, praw.errors.InvalidUserPass, HTTPError) as e:
             print e
-            myBot.log_err(e)
+            logging.debug(str(error) + "\n\n")
             exit(1)
 
     while True:
@@ -365,7 +357,7 @@ if __name__ == "__main__":
 
                 except HTTPError, e:
                     print e
-                    myBot.log_err(e)
+                    logging.debug(str(error) + "\n\n")
 
                     # try this 3 times
                     while myBot.userRetry <= 3:
@@ -380,7 +372,7 @@ if __name__ == "__main__":
 
                         except Exception, e:
                             print e
-                            myBot.log_err(e)
+                            logging.debug(str(error) + "\n\n")
                             myBot.userRetry += 1
                     
                     if myBot.userRetry > 3:
@@ -389,7 +381,7 @@ if __name__ == "__main__":
 
                 except Exception, e:
                     print e
-                    myBot.log_err(e)
+                    logging.debug(str(error) + "\n\n")
                     exit(1)
 
                 for user in userList:
@@ -405,7 +397,7 @@ if __name__ == "__main__":
 
                 except HTTPError, e:
                     print e
-                    myBot.log_err(e)
+                    logging.debug(str(error) + "\n\n")
 
                     while myBot.subRetry <= 3:
 
@@ -420,7 +412,7 @@ if __name__ == "__main__":
 
                         except Exception, e:
                             print e
-                            myBot.log_err(e)
+                            logging.debug(str(error) + "\n\n")
                             myBot.subRetry += 1
                     
                     if myBot.subRetry > 3:
@@ -429,7 +421,7 @@ if __name__ == "__main__":
 
                 except Exception, e:
                     print e
-                    myBot.log_err(e)
+                    logging.debug(str(error) + "\n\n")
                     exit(1)
 
                 for sub in subredditList:
@@ -453,7 +445,7 @@ if __name__ == "__main__":
 
                 except Exception, e:
                     print e
-                    myBot.log_err(e)
+                    logging.debug(str(error) + "\n\n")
                     exit(1)
 
                 try:
@@ -463,7 +455,7 @@ if __name__ == "__main__":
 
                 except HTTPError, e:
                     print e
-                    myBot.log_err(e)
+                    logging.debug(str(error) + "\n\n")
 
                     while myBot.submitRetry <= 3:
 
@@ -476,7 +468,7 @@ if __name__ == "__main__":
 
                         except Exception, e:
                             print e
-                            myBot.log_err(e)
+                            logging.debug(str(error) + "\n\n")
                             myBot.submitRetry += 1
 
                     if myBot.submitRetry > 3:
@@ -486,6 +478,6 @@ if __name__ == "__main__":
                 
                 except Exception, e:
                     print e
-                    myBot.log_err(e)
+                    logging.debug(str(error) + "\n\n")
                     myBot.log_post(subreddit, text)
                     exit(1)
