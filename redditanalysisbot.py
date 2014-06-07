@@ -335,7 +335,7 @@ if __name__ == "__main__":
 
     except (praw.errors.InvalidUser, praw.errors.InvalidUserPass, HTTPError) as e:
             print e
-            logging.debug(str(error) + "\n\n")
+            logging.debug(str(e) + "\n\n")
             exit(1)
 
     while True:
@@ -357,7 +357,7 @@ if __name__ == "__main__":
 
                 except HTTPError, e:
                     print e
-                    logging.debug(str(error) + "\n\n")
+                    logging.debug(str(e) + "\n\n")
 
                     # try this 3 times
                     while myBot.userRetry <= 3:
@@ -372,7 +372,7 @@ if __name__ == "__main__":
 
                         except Exception, e:
                             print e
-                            logging.debug(str(error) + "\n\n")
+                            logging.debug(str(e) + "\n\n")
                             myBot.userRetry += 1
                     
                     if myBot.userRetry > 3:
@@ -381,7 +381,7 @@ if __name__ == "__main__":
 
                 except Exception, e:
                     print e
-                    logging.debug(str(error) + "\n\n")
+                    logging.debug(str(e) + "\n\n")
                     exit(1)
 
                 for user in userList:
@@ -397,7 +397,7 @@ if __name__ == "__main__":
 
                 except HTTPError, e:
                     print e
-                    logging.debug(str(error) + "\n\n")
+                    logging.debug(str(e) + "\n\n")
 
                     while myBot.subRetry <= 3:
 
@@ -412,7 +412,7 @@ if __name__ == "__main__":
 
                         except Exception, e:
                             print e
-                            logging.debug(str(error) + "\n\n")
+                            logging.debug(str(e) + "\n\n")
                             myBot.subRetry += 1
                     
                     if myBot.subRetry > 3:
@@ -421,7 +421,7 @@ if __name__ == "__main__":
 
                 except Exception, e:
                     print e
-                    logging.debug(str(error) + "\n\n")
+                    logging.debug(str(e) + "\n\n")
                     exit(1)
 
                 for sub in subredditList:
@@ -445,7 +445,7 @@ if __name__ == "__main__":
 
                 except Exception, e:
                     print e
-                    logging.debug(str(error) + "\n\n")
+                    logging.debug(str(e) + "\n\n")
                     exit(1)
 
                 try:
@@ -459,7 +459,7 @@ if __name__ == "__main__":
 
                 except HTTPError, e:
                     print e
-                    logging.debug(str(error) + "\n\n")
+                    logging.debug(str(e) + "\n\n")
 
                     while myBot.submitRetry <= 3:
 
@@ -475,7 +475,7 @@ if __name__ == "__main__":
 
                         except Exception, e:
                             print e
-                            logging.debug(str(error) + "\n\n")
+                            logging.debug(str(e) + "\n\n")
                             myBot.submitRetry += 1
 
                     if myBot.submitRetry > 3:
@@ -485,6 +485,6 @@ if __name__ == "__main__":
                 
                 except Exception, e:
                     print e
-                    logging.debug(str(error) + "\n\n")
+                    logging.debug(str(e) + "\n\n")
                     myBot.log_post(subreddit, text)
                     exit(1)
