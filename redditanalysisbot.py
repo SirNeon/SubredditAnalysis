@@ -270,7 +270,7 @@ class SubredditAnalysis(object):
         title = "/r/%s Drilldown %s" % (subreddit, datetime.now().strftime("%B %Y"))
 
         # finally submit it
-        self.mySubreddit.submit(title, text)
+        return self.mySubreddit.submit(title, text)
     
 
     def log_info(self, info):
@@ -309,7 +309,7 @@ if __name__ == "__main__":
     myBot = SubredditAnalysis()
 
     # set these to False if you don't want logs
-    myBot.infoLogging = False
+    myBot.infoLogging = True
     errorLogging = True
     myBot.postLogging = True
 
@@ -450,8 +450,12 @@ if __name__ == "__main__":
 
                 try:
                     # submit the post for Reddit
-                    myBot.submit_post(subreddit, text)
+                    post = myBot.submit_post(subreddit, text)
                     myBot.submitRetry = 0
+
+                    # this requires mod privileges
+                    print "Setting post's flair..."
+                    myBot.client.set_flair(myBot.post_to, post, flair_text=subreddit)
 
                 except HTTPError, e:
                     print e
@@ -463,7 +467,10 @@ if __name__ == "__main__":
                         sleep(300)
 
                         try:
-                            myBot.submit_post(subreddit, text)
+                            post = myBot.submit_post(subreddit, text)
+                            
+                            print "Setting post's flair..."
+                            myBot.client.set_flair(myBot.post_to, post, flair_text=subreddit)
                             break
 
                         except Exception, e:
