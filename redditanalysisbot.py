@@ -318,7 +318,7 @@ if __name__ == "__main__":
             filename="SubredditAnalysis_logerr.log", 
             filemode='a', format="%(asctime)s\nIn "
             "%(filename)s (%(funcName)s:%(lineno)s): "
-            "%(message)s", datefmt="%Y-%m-%d %H:%M", 
+            "%(message)s", datefmt="%Y-%m-%d %H:%M:%S", 
             level=logging.DEBUG, stream=stderr
         )
 
