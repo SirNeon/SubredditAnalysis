@@ -6,6 +6,7 @@ from sys import exit, stderr
 from time import sleep
 import praw
 from praw.errors import *
+from requests import HTTPError
 
 
 class skipThis(Exception):
@@ -145,7 +146,7 @@ class SubredditAnalysis(object):
                 comments = self.client.get_redditor(user).get_comments('all')
 
             # handle shadowbanned/deleted accounts
-            except APIException, e:
+            except HTTPError, e:
                 print e
                 continue
 
@@ -330,12 +331,12 @@ if __name__ == "__main__":
             myBot.login(username, password)
             break
 
-        except (InvalidUser, InvalidUserPass, NonExistentUser, RateLimitExceeded) as e:
+        except (InvalidUser, InvalidUserPass, NonExistentUser, RateLimitExceeded, APIException) as e:
                 print e
                 logging.debug(str(e) + "\n\n")
                 exit(1)
 
-        except APIException, e:
+        except HTTPError, e:
             print e
             logging.debug(str(e) + "\n\n")
             
@@ -373,14 +374,14 @@ if __name__ == "__main__":
                             drilldownList.remove(subreddit)
                             raise skipThis
 
-                        except APIException, e:
+                        except HTTPError, e:
                             print e
                             logging.debug(str(e) + "\n\n")
                             print "Waiting to try again..."
                             sleep(60)
                             continue
 
-                        except (ClientException, Exception) as e:
+                        except (APIException, ClientException, Exception) as e:
                             print e
                             logging.debug(str(e) + "\n\n")
                             raise skipThis
@@ -402,13 +403,13 @@ if __name__ == "__main__":
                             subredditList = myBot.get_subs(userList)
                             break
 
-                        except APIException, e:
+                        except HTTPError, e:
                             print e
                             logging.debug(str(e) + "\n\n")
                             sleep(60)
                             continue
 
-                        except (ClientException, Exception) as e:
+                        except (APIException, ClientException, Exception) as e:
                             print e
                             logging.debug(str(e) + "\n\n")
                             raise skipThis
@@ -448,13 +449,13 @@ if __name__ == "__main__":
                             post = myBot.submit_post(subreddit, text)
                             break
 
-                        except APIException, e:
+                        except HTTPError, e:
                             print e
                             logging.debug(str(e) + "\n\n")
                             sleep(60)
                             continue
 
-                        except (ClientException, Exception) as e:
+                        except (APIException, ClientException, Exception) as e:
                             print e
                             logging.debug(str(e) + "\n\n")
                             raise skipThis
@@ -477,15 +478,15 @@ if __name__ == "__main__":
                             except ModeratorRequired, e:
                                 print e
                                 logging.debug("Failed to set flair. " + str(e) + '\n' + str(submission.permalink) + "\n\n")
-                                break
+                                raise skipThis
 
-                            except APIException, e:
+                            except HTTPError, e:
                                 print e
                                 logging.debug(str(e) + "\n\n")
                                 sleep(60)
                                 continue
 
-                            except (ClientException, Exception) as e:
+                            except (APIException, ClientException, Exception) as e:
                                 print e
                                 logging.debug(str(e) + "\n\n")
                                 raise skipThis
