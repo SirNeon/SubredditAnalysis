@@ -5,7 +5,11 @@ import operator
 from sys import exit, stderr
 from time import sleep
 import praw
-from requests import HTTPError
+from praw.errors import *
+
+
+class skipThis(Exception):
+    pass
 
 
 class SubredditAnalysis(object):
@@ -24,18 +28,6 @@ class SubredditAnalysis(object):
         self.post_to = "SubredditAnalysis"
 
         self.useragent = "Reddit Analysis Bot by /u/SirNeon"
-
-        # keep count of how many attempts have been made
-        # to get a list of users for the target subreddit
-        self.userRetry = 0
-
-        # keep count of how many attempts have been made
-        # to get a list of subreddits for the target subreddit
-        self.subRetry = 0
-
-        # keep count of how many attempts have been made
-        # to submit a post to Reddit
-        self.submitRetry = 0
 
         # optional logging
         self.infoLogging = True
@@ -86,7 +78,7 @@ class SubredditAnalysis(object):
         It returns a list of users.
         """
 
-        print "Getting users for /r/%s..." % subreddit
+        print "Getting users for /r/{0}...".format(subreddit)
 
         # get threads from the hot list
         submissions = self.client.get_subreddit(subreddit).get_hot(limit=self.scrapeLimit)
@@ -106,7 +98,7 @@ class SubredditAnalysis(object):
             # make sure that users don't get added multiple times
             if submitter not in self.userList:
                 self.userList.append(submitter)
-                print "%d users found up to thread (%d / %d)." % (len(self.userList), i + 1, self.scrapeLimit)
+                print "{0} users found up to thread ({1} / {2}).".format(len(self.userList), i + 1, self.scrapeLimit)
 
 
             # load more comments
@@ -123,7 +115,7 @@ class SubredditAnalysis(object):
 
                 if commenter not in self.userList:
                     self.userList.append(commenter)
-                    print "%d users found up to thread (%d / %d)." % (len(self.userList), i + 1, self.scrapeLimit)
+                    print "{0} users found up to thread ({1} / {2}).".format(len(self.userList), i + 1, self.scrapeLimit)
 
         return self.userList
 
@@ -153,7 +145,8 @@ class SubredditAnalysis(object):
                 comments = self.client.get_redditor(user).get_comments('all')
 
             # handle shadowbanned/deleted accounts
-            except HTTPError:
+            except APIException, e:
+                print e
                 continue
 
             # keeps track of user subs to prevent multiple
@@ -163,7 +156,7 @@ class SubredditAnalysis(object):
             # keeps track of how many users are remaining
             usersLeft = len(userList) - i - 1
 
-            print "(%d / %d) users remaining." % (usersLeft, len(userList))
+            print "({0} / {1}) users remaining.".format(usersLeft, len(userList))
 
             for comment in comments:
                 try:
@@ -180,8 +173,9 @@ class SubredditAnalysis(object):
 
                 # add the ones that aren't kept in the list
                 # to the list of subreddits
-                if((csubreddit not in subredditList) & (csubreddit not in self.banList)):
-                    subredditList.append(csubreddit)
+                if csubreddit not in subredditList:
+                    if csubreddit not in self.banList:
+                        subredditList.append(csubreddit)
 
         return subredditList
 
@@ -208,8 +202,9 @@ class SubredditAnalysis(object):
             # in the selected subreddit
             # also exclude crossovers with less than 10 posters
             self.intCounter = int(self.counter[item])
-            if((item.lower() != subreddit.lower()) & (self.intCounter >= 10)):
-                self.subredditTuple.append((item, self.intCounter))
+            if item.lower() != subreddit.lower():
+                if self.intCounter >= 5:
+                    self.subredditTuple.append((item, self.intCounter))
 
         # sorts biggest to smallest by the 2nd tuple value
         # which is the post tally
@@ -231,8 +226,8 @@ class SubredditAnalysis(object):
         print "Formatting post..."
 
         # make a table
-        self.bodyStart = "## /r/%s Drilldown\n\n" % subreddit
-        self.bodyStart += "Of %d Users Found:\n\n" % len(userList)
+        self.bodyStart = "## /r/{0} Drilldown\n\n".format(subreddit)
+        self.bodyStart += "Of {0} Users Found:\n\n".format(len(userList))
         self.bodyStart += "| Subreddit | Overlapping users |\n"
         self.bodyStart += "|:------|------:|\n"
 
@@ -242,7 +237,7 @@ class SubredditAnalysis(object):
         for i in range(0, len(subredditTuple)):
             sub = "".join(subredditTuple[i][0])
             overlap = "".join(str(subredditTuple[i][1]))
-            self.bodyContent += "|/r/%s|%s|\n" % (sub, overlap)
+            self.bodyContent += "|/r/{0}|{1}|\n".format(sub, overlap)
 
             if len(self.bodyStart + self.bodyContent) >= 9900:
                 # so the table doesn't get too big to post
@@ -267,7 +262,7 @@ class SubredditAnalysis(object):
         self.mySubreddit = self.client.get_subreddit(self.post_to)
 
         # thread title
-        title = "/r/%s Drilldown %s" % (subreddit, datetime.now().strftime("%B %Y"))
+        title = "/r/{0} Drilldown {1}".format(subreddit, datetime.now().strftime("%B %Y"))
 
         # finally submit it
         return self.mySubreddit.submit(title, text)
@@ -280,7 +275,7 @@ class SubredditAnalysis(object):
 
         if(self.infoLogging):
             self.logDate = str(datetime.now().strftime("%Y-%m-%d"))
-            self.logName = "SubredditAnalysis_%s.txt" % (self.logDate)
+            self.logName = "SubredditAnalysis_{0}.txt".format(self.logDate)
             self.logFile = open(self.logName, 'a')
 
             self.logFile.write(str(info))
@@ -297,7 +292,7 @@ class SubredditAnalysis(object):
         """
 
         if(self.postLogging):
-            self.logName = "%s_results.txt" % subreddit
+            self.logName = "{0}_results.txt".format(subreddit)
             self.postFile = open(self.logName, 'a')
 
             self.postFile.write(str(post))
@@ -330,13 +325,28 @@ if __name__ == "__main__":
 
     print "Type \"quit\", \".quit\", or \'q\' to exit the program."
 
-    try:
-        myBot.login(username, password)
+    for i in range(0, 3):
+        try:
+            myBot.login(username, password)
+            break
 
-    except (praw.errors.InvalidUser, praw.errors.InvalidUserPass, HTTPError) as e:
+        except (InvalidUser, InvalidUserPass, NonExistentUser, RateLimitExceeded) as e:
+                print e
+                logging.debug(str(e) + "\n\n")
+                exit(1)
+
+        except APIException, e:
             print e
             logging.debug(str(e) + "\n\n")
-            exit(1)
+            
+            if i == 2:
+                print "Failed to login."
+                exit(1)
+            
+            else:
+                # wait a minute and try again
+                sleep(60)
+                continue
 
     while True:
         # list of subreddits you want to analyze
@@ -345,44 +355,39 @@ if __name__ == "__main__":
         # iterate through the drilldownList to get data
         for subreddit in drilldownList:
 
-            if(subreddit in ['quit', '.quit', 'q']):
+            if(subreddit in ["quit", ".quit", 'q']):
                 print "Quitting..."
                 exit(0)
 
             else:
-                # get the list of users
                 try:
-                    userList = myBot.get_users(subreddit)
-                    myBot.userRetry = 0
-
-                except HTTPError, e:
-                    print e
-                    logging.debug(str(e) + "\n\n")
-
-                    # try this 3 times
-                    while myBot.userRetry <= 3:
-                        # wait 5 minutes and try again
-                        # maybe Reddit broke and just needs some time
-                        print "Waiting 5 minutes to try again..."
-                        sleep(300)
-
+                    while True:
+                        # get the list of users
                         try:
                             userList = myBot.get_users(subreddit)
                             break
 
-                        except Exception, e:
+                        except InvalidSubreddit, e:
+                            print e
+                            logging.debug("Invalid subreddit. Removing from list." + str(e) + "\n\n")
+                            drilldownList.remove(subreddit)
+                            raise skipThis
+
+                        except APIException, e:
                             print e
                             logging.debug(str(e) + "\n\n")
-                            myBot.userRetry += 1
-                    
-                    if myBot.userRetry > 3:
-                        print "Failed to get users."
-                        exit(1)
+                            print "Waiting to try again..."
+                            sleep(60)
+                            continue
 
-                except Exception, e:
-                    print e
-                    logging.debug(str(e) + "\n\n")
-                    exit(1)
+                        except (ClientException, Exception) as e:
+                            print e
+                            logging.debug(str(e) + "\n\n")
+                            raise skipThis
+
+                except skipThis:
+                    print "Couldn't get user list. Skipping..."
+                    continue
 
                 for user in userList:
                     myBot.log_info(user + ',')
@@ -391,38 +396,26 @@ if __name__ == "__main__":
 
 
                 try:
-                    # get the list of subreddits
-                    subredditList = myBot.get_subs(userList)
-                    myBot.subRetry = 0
-
-                except HTTPError, e:
-                    print e
-                    logging.debug(str(e) + "\n\n")
-
-                    while myBot.subRetry <= 3:
-
-                        # wait 5 minutes and try again
-                        # maybe Reddit broke and just needs some time
-                        print "Waiting 5 minutes to try again..."
-                        sleep(300)
-
+                    while True:
                         try:
-                            subredditList = myBot.get_subs(subreddit)
+                            # get the list of subreddits
+                            subredditList = myBot.get_subs(userList)
                             break
 
-                        except Exception, e:
+                        except APIException, e:
                             print e
                             logging.debug(str(e) + "\n\n")
-                            myBot.subRetry += 1
-                    
-                    if myBot.subRetry > 3:
-                        print "Failed to get overlapping subreddits."
-                        exit(1)
+                            sleep(60)
+                            continue
 
-                except Exception, e:
-                    print e
-                    logging.debug(str(e) + "\n\n")
-                    exit(1)
+                        except (ClientException, Exception) as e:
+                            print e
+                            logging.debug(str(e) + "\n\n")
+                            raise skipThis
+
+                except skipThis:
+                    print "Couldn't get subreddit list. Skipping..."
+                    continue
 
                 for sub in subredditList:
                     myBot.log_info(sub + ',')
@@ -445,46 +438,58 @@ if __name__ == "__main__":
 
                 except Exception, e:
                     print e
-                    logging.debug(str(e) + "\n\n")
-                    exit(1)
+                    logging.debug("Failed to create tuples. " + str(e) + "\n\n")
+                    continue
 
                 try:
-                    # submit the post for Reddit
-                    post = myBot.submit_post(subreddit, text)
-                    myBot.submitRetry = 0
-
-                    # this requires mod privileges
-                    print "Setting post's flair..."
-                    myBot.client.set_flair(myBot.post_to, post, flair_text=subreddit)
-
-                except HTTPError, e:
-                    print e
-                    logging.debug(str(e) + "\n\n")
-
-                    while myBot.submitRetry <= 3:
-
-                        print "Waiting 5 minutes to try again..."
-                        sleep(300)
-
+                    while True:
                         try:
+                            # submit the post for Reddit
                             post = myBot.submit_post(subreddit, text)
-                            
-                            print "Setting post's flair..."
-                            myBot.client.set_flair(myBot.post_to, post, flair_text=subreddit)
                             break
 
-                        except Exception, e:
+                        except APIException, e:
                             print e
                             logging.debug(str(e) + "\n\n")
-                            myBot.submitRetry += 1
+                            sleep(60)
+                            continue
 
-                    if myBot.submitRetry > 3:
-                        print "Failed to submit post."
-                        myBot.log_post(subreddit, text)
-                        exit(1)
-                
-                except Exception, e:
-                    print e
+                        except (ClientException, Exception) as e:
+                            print e
+                            logging.debug(str(e) + "\n\n")
+                            raise skipThis
+
+                except skipThis:
+                    print "Couldn't submit post. Skipping..."
                     logging.debug(str(e) + "\n\n")
                     myBot.log_post(subreddit, text)
-                    exit(1)
+                    continue
+
+                if(post != None):
+                    try:
+                        for i in range(0, 3):
+                            # this requires mod privileges
+                            try:
+                                print "Setting post's flair..."
+                                myBot.client.set_flair(myBot.post_to, post, flair_text=subreddit)
+                                break
+
+                            except ModeratorRequired, e:
+                                print e
+                                logging.debug("Failed to set flair. " + str(e) + '\n' + str(submission.permalink) + "\n\n")
+                                break
+
+                            except APIException, e:
+                                print e
+                                logging.debug(str(e) + "\n\n")
+                                sleep(60)
+                                continue
+
+                            except (ClientException, Exception) as e:
+                                print e
+                                logging.debug(str(e) + "\n\n")
+                                raise skipThis
+
+                    except skipThis:
+                        print "Couldn't assign flair. Skipping..."
+                        continue
