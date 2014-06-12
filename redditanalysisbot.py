@@ -6,7 +6,7 @@ from sys import exit, stderr
 from time import sleep
 import praw
 from praw.errors import *
-from requests import HTTPError
+from requests.exceptions import HTTPError
 
 
 class skipThis(Exception):
