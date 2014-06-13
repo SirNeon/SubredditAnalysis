@@ -2,6 +2,7 @@ from collections import Counter
 from datetime import datetime
 import logging
 import operator
+import optparse
 from sys import exit, stderr
 from time import sleep
 import praw
@@ -60,7 +61,7 @@ class SubredditAnalysis(object):
         """
 
         self.client = praw.Reddit(user_agent=self.useragent)
-        print "Logging in..."
+        print "Logging in as {0}...".format(username)
 
         self.client.login(username, password)
         print "Login successful."
@@ -391,14 +392,56 @@ def check_subreddits(subredditList):
 
     # keeps this message from being displayed when
     # the only item is a quit command
-    if len(subredditList) > 1:
+    if subredditList[0] not in ["quit", ".quit", 'q']:
         print "Subreddit verification completed."
 
 
 def main():
+    
     # login credentials
+    # they can be overwritten with commandline arguments
     username = ""
     password = ""
+
+    
+    # commandline options for additional feature support
+    parser = optparse.OptionParser("python redditanalysisbot.py [options]")
+    parser.add_option("--aL", "--enableLogging", dest="enableLogging", type="string", help="Turn all logging on or off.")
+    parser.add_option("-b", "--banList", dest="banOption", type="string", help="Turn the ban list on and off.")
+    parser.add_option("--iL", "--infoLogging", dest="infoLogging", type="string", help="Turn raw data logging on and off.")
+    parser.add_option("-p", "--postHere", dest="SubredditName", type="string", help="Post to this subreddit.")
+    parser.add_option("--pL", "--postLogging", dest="postLogging", type="string", help="Turn post logging on and off.")
+    parser.add_option("-s", "--scrapeLimit", dest="ScrapeLimit", type="int", help="Set the number of submissions to be scanned.")
+    parser.add_option("-u", "--userCreds", dest="userCreds", type="string", help="Give the bot the username and password for a Reddit account. Separate them with a comma.")
+    (options, args) = parser.parse_args()
+
+    if options.enableLogging is not None:
+        if options.enableLogging.lower() == "off":
+            myBot.infoLogging = False
+            myBot.postLogging = False
+
+    if options.banOption is not None:
+        if options.banOption.lower() == "off":
+            myBot.banList = []
+
+    if options.infoLogging is not None:
+        if options.infoLogging.lower() == "off":
+            myBot.infoLogging = False
+
+    if options.postLogging is not None:
+        if options.postLogging.lower() == "off":
+            myBot.postLogging = False
+
+    if options.SubredditName is not None:
+        myBot.post_to = options.SubredditName
+
+    if options.ScrapeLimit is not None:
+        myBot.scrapeLimit = options.ScrapeLimit
+
+    if options.userCreds is not None:
+        credentials = options.userCreds.split(',')
+        username = credentials[0]
+        password = credentials[1]
 
     print "Welcome to Reddit Analysis Bot."
 
@@ -444,7 +487,14 @@ def main():
                         except (APIException, ClientException, Exception) as e:
                             print e
                             logging.debug(str(e) + "\n\n")
-                            raise skipThis
+
+                            if str(e) == "timed out":
+                                print "Waiting to try again..."
+                                sleep(60)
+                                continue
+
+                            else:
+                                raise skipThis
 
                 except skipThis:
                     print "Couldn't get user list. Skipping..."
@@ -473,7 +523,14 @@ def main():
                         except (APIException, ClientException, Exception) as e:
                             print e
                             logging.debug(str(e) + "\n\n")
-                            raise skipThis
+
+                            if str(e) == "timed out":
+                                print "Waiting a minute to try again."
+                                sleep(60)
+                                continue
+
+                            else:
+                                raise skipThis
 
                 except skipThis:
                     print "Couldn't get subreddit list. Skipping..."
@@ -520,7 +577,14 @@ def main():
                         except (APIException, ClientException, Exception) as e:
                             print e
                             logging.debug(str(e) + "\n\n")
-                            raise skipThis
+
+                            if str(e) == "timed out":
+                                print "Waiting to try again..."
+                                sleep(60)
+                                continue
+
+                            else:
+                                raise skipThis
 
                 except skipThis:
                     print "Couldn't submit post. Skipping..."
@@ -552,7 +616,14 @@ def main():
                             except (APIException, ClientException, Exception) as e:
                                 print e
                                 logging.debug(str(e) + "\n\n")
-                                raise skipThis
+
+                                if str(e) == "timed out":
+                                    print "Waiting to try again..."
+                                    sleep(60)
+                                    continue
+
+                                else:
+                                    raise skipThis
 
                     except skipThis:
                         print "Couldn't assign flair. Skipping..."
@@ -563,7 +634,7 @@ if __name__ == "__main__":
     myBot = SubredditAnalysis()
 
     # set these to False if you don't want logs
-    myBot.infoLogging = True
+    myBot.infoLogging = False
     errorLogging = True
     myBot.postLogging = True
 
