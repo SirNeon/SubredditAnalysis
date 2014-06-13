@@ -378,7 +378,14 @@ def check_subreddits(subredditList):
                 except (APIException, ClientException, Exception) as e:
                     print e
                     logging.debug(str(e) + "\n\n")
-                    raise skipThis
+                    
+                    if str(e) == "timed out":
+                        print "Waiting to try again..."
+                        sleep(60)
+                        continue
+
+                    else:
+                        raise skipThis
 
             break
 
