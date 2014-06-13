@@ -378,7 +378,7 @@ def check_subreddits(subredditList):
                 except (APIException, ClientException, Exception) as e:
                     print e
                     logging.debug(str(e) + "\n\n")
-                    
+
                     if str(e) == "timed out":
                         print "Waiting to try again..."
                         sleep(60)
@@ -413,12 +413,12 @@ def main():
     
     # commandline options for additional feature support
     parser = optparse.OptionParser("python redditanalysisbot.py [options]")
-    parser.add_option("--aL", "--enableLogging", dest="enableLogging", type="string", help="Turn all logging on or off.")
-    parser.add_option("-b", "--banList", dest="banOption", type="string", help="Turn the ban list on and off.")
-    parser.add_option("--iL", "--infoLogging", dest="infoLogging", type="string", help="Turn raw data logging on and off.")
+    parser.add_option("--aL", "--enableLogging", dest="enableLogging", type="string", help="Turn all logging on or off. On by default.")
+    parser.add_option("-b", "--banList", dest="banOption", type="string", help="Turn the ban list on and off. On by default.")
+    parser.add_option("--iL", "--infoLogging", dest="infoLogging", type="string", help="Turn raw data logging on and off. On by default.")
     parser.add_option("-p", "--postHere", dest="SubredditName", type="string", help="Post to this subreddit.")
-    parser.add_option("--pL", "--postLogging", dest="postLogging", type="string", help="Turn post logging on and off.")
-    parser.add_option("-s", "--scrapeLimit", dest="ScrapeLimit", type="int", help="Set the number of submissions to be scanned.")
+    parser.add_option("--pL", "--postLogging", dest="postLogging", type="string", help="Turn post logging on and off. On by default.")
+    parser.add_option("-s", "--scrapeLimit", dest="ScrapeLimit", type="int", help="Set the number of submissions to be scanned. 1000 by default.")
     parser.add_option("-u", "--userCreds", dest="userCreds", type="string", help="Give the bot the username and password for a Reddit account. Separate them with a comma.")
     (options, args) = parser.parse_args()
 
@@ -641,7 +641,7 @@ if __name__ == "__main__":
     myBot = SubredditAnalysis()
 
     # set these to False if you don't want logs
-    myBot.infoLogging = False
+    myBot.infoLogging = True
     errorLogging = True
     myBot.postLogging = True
 
