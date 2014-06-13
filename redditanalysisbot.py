@@ -9,10 +9,6 @@ from praw.errors import *
 from requests.exceptions import HTTPError
 
 
-class skipThis(Exception):
-    pass
-
-
 class SubredditAnalysis(object):
 
 
@@ -301,37 +297,17 @@ class SubredditAnalysis(object):
             self.postFile.close()
 
 
-if __name__ == "__main__":
-    myBot = SubredditAnalysis()
+class skipThis(Exception):
+    pass
 
-    # set these to False if you don't want logs
-    myBot.infoLogging = True
-    errorLogging = True
-    myBot.postLogging = True
 
-    if(errorLogging):
-        logging.basicConfig(
-            filename="SubredditAnalysis_logerr.log", 
-            filemode='a', format="%(asctime)s\nIn "
-            "%(filename)s (%(funcName)s:%(lineno)s): "
-            "%(message)s", datefmt="%Y-%m-%d %H:%M:%S", 
-            level=logging.DEBUG, stream=stderr
-        )
-
-    # login credentials
-    username = ""
-    password = ""
-
-    print "Welcome to Reddit Analysis Bot."
-
-    print "Type \"quit\", \".quit\", or \'q\' to exit the program."
-
+def login(username, password):
     for i in range(0, 3):
         try:
             myBot.login(username, password)
             break
 
-        except (InvalidUser, InvalidUserPass, NonExistentUser, RateLimitExceeded, APIException) as e:
+        except (InvalidUser, InvalidUserPass, RateLimitExceeded, APIException) as e:
                 print e
                 logging.debug(str(e) + "\n\n")
                 exit(1)
@@ -349,9 +325,93 @@ if __name__ == "__main__":
                 sleep(60)
                 continue
 
+
+def check_subreddits(subredditList):
+    """
+    Checks on the listed subreddits to make sure that they are 
+    valid subreddits and that there's no typos and whatnot. This 
+    function removes the bad subreddits from the list so the bot 
+    can carry on with its task. Feed it the list of subreddits.
+    """
+
+    for i in range(0, 3):
+        try:
+            for subreddit in subredditList:
+                if(subreddit in ["quit", ".quit", 'q']):
+                    continue
+
+                print "Verifying /r/{0}...".format(subreddit)
+
+                try:
+                    # make sure the subreddit is valid
+                    testSubmission = myBot.client.get_subreddit(subreddit).get_new(limit=1)
+                    for submission in testSubmission:
+                        "".join(submission.title)
+
+                except (InvalidSubreddit, RedirectException) as e:
+                    print e
+                    logging.debug("Invalid subreddit. Removing from list." + str(e) + "\n\n")
+                    subredditList.remove(subreddit)
+                    raise skipThis
+
+                except HTTPError, e:
+                    print e
+                    logging.debug(str(subreddit) + ' ' + str(e) + "\n\n")
+
+                    # private subreddits return a 403 error
+                    if "403" in str(e):
+                        print "/r/{0} is private. Removing from list...".format(subreddit)
+                        subredditList.remove(subreddit)
+                        continue
+
+                    # banned subreddits return a 404 error
+                    if "404" in str(e):
+                        print "/r/{0} banned. Removing from list...".format(subreddit)
+                        subredditList.remove(subreddit)
+                        continue
+
+                    print "Waiting a minute to try again..."    
+                    sleep(60)
+                    raise skipThis
+
+                except (APIException, ClientException, Exception) as e:
+                    print e
+                    logging.debug(str(e) + "\n\n")
+                    raise skipThis
+
+            break
+
+        except skipThis:
+            if i == 2:
+                print "Couldn't verify the validity of the listed subreddits. Quitting..."
+                exit(1)
+
+            else:
+                continue
+
+    # keeps this message from being displayed when
+    # the only item is a quit command
+    if len(subredditList) > 1:
+        print "Subreddit verification completed."
+
+
+def main():
+    # login credentials
+    username = ""
+    password = ""
+
+    print "Welcome to Reddit Analysis Bot."
+
+    print "Type \"quit\", \".quit\", or \'q\' to exit the program."
+
+    login(username, password)
+
     while True:
         # list of subreddits you want to analyze
         drilldownList = raw_input("Enter the subreddits you wish to target.~/> ").split()
+
+        # check to make sure each subreddit is valid
+        check_subreddits(drilldownList)
 
         # iterate through the drilldownList to get data
         for subreddit in drilldownList:
@@ -368,7 +428,7 @@ if __name__ == "__main__":
                             userList = myBot.get_users(subreddit)
                             break
 
-                        except InvalidSubreddit, e:
+                        except (InvalidSubreddit, RedirectException) as e:
                             print e
                             logging.debug("Invalid subreddit. Removing from list." + str(e) + "\n\n")
                             drilldownList.remove(subreddit)
@@ -406,6 +466,7 @@ if __name__ == "__main__":
                         except HTTPError, e:
                             print e
                             logging.debug(str(e) + "\n\n")
+                            print "Waiting to try again..."
                             sleep(60)
                             continue
 
@@ -452,6 +513,7 @@ if __name__ == "__main__":
                         except HTTPError, e:
                             print e
                             logging.debug(str(e) + "\n\n")
+                            print "Waiting to try again..."
                             sleep(60)
                             continue
 
@@ -483,6 +545,7 @@ if __name__ == "__main__":
                             except HTTPError, e:
                                 print e
                                 logging.debug(str(e) + "\n\n")
+                                print "Waiting to try again..."
                                 sleep(60)
                                 continue
 
@@ -494,3 +557,23 @@ if __name__ == "__main__":
                     except skipThis:
                         print "Couldn't assign flair. Skipping..."
                         continue
+
+
+if __name__ == "__main__":
+    myBot = SubredditAnalysis()
+
+    # set these to False if you don't want logs
+    myBot.infoLogging = True
+    errorLogging = True
+    myBot.postLogging = True
+
+    if(errorLogging):
+        logging.basicConfig(
+            filename="SubredditAnalysis_logerr.log", 
+            filemode='a', format="%(asctime)s\nIn "
+            "%(filename)s (%(funcName)s:%(lineno)s): "
+            "%(message)s", datefmt="%Y-%m-%d %H:%M:%S", 
+            level=logging.DEBUG, stream=stderr
+        )
+
+    main()
