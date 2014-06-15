@@ -18,6 +18,9 @@ class SubredditAnalysis(object):
         Initialize the class with some basic attributes.
         """
 
+        # add terminal output
+        self.verbose = False
+
         # maximum threads to crawl. Reddit doesn't
         # like it when you go over 1000
         self.scrapeLimit = 1000
@@ -28,8 +31,8 @@ class SubredditAnalysis(object):
         self.useragent = "Reddit Analysis Bot by /u/SirNeon"
 
         # optional logging
-        self.infoLogging = True
-        self.postLogging = True
+        self.infoLogging = False
+        self.postLogging = False
 
         # I've banned defaults and former defaults since
         # there's bound to be overlap with those due to
@@ -52,6 +55,21 @@ class SubredditAnalysis(object):
             "TwoXChromosomes", "UpliftingNews", "videos",
             "worldnews", "WritingPrompts", "WTF"
         ]
+
+
+    def add_msg(self, msg=None, newline=False):
+        """
+        Simple function to make terminal output optional. Feed
+        it the message to print out. Can alsotell it to print a 
+        newline if you want to.
+        """
+
+        if(self.verbose):
+            if msg is not None:
+                print msg
+
+            if(newline):
+                print '\n'
 
 
     def login(self, username, password):
@@ -96,7 +114,7 @@ class SubredditAnalysis(object):
             # make sure that users don't get added multiple times
             if submitter not in self.userList:
                 self.userList.append(submitter)
-                print "{0} users found up to thread ({1} / {2}).".format(len(self.userList), i + 1, self.scrapeLimit)
+                self.add_msg("{0} users found up to thread ({1} / {2}).".format(len(self.userList), i + 1, self.scrapeLimit))
 
 
             # load more comments
@@ -113,7 +131,7 @@ class SubredditAnalysis(object):
 
                 if commenter not in self.userList:
                     self.userList.append(commenter)
-                    print "{0} users found up to thread ({1} / {2}).".format(len(self.userList), i + 1, self.scrapeLimit)
+                    self.add_msg("{0} users found up to thread ({1} / {2}).".format(len(self.userList), i + 1, self.scrapeLimit))
 
         return self.userList
 
@@ -144,7 +162,7 @@ class SubredditAnalysis(object):
 
             # handle shadowbanned/deleted accounts
             except HTTPError, e:
-                print e
+                self.add_msg(e)
                 continue
 
             # keeps track of user subs to prevent multiple
@@ -154,7 +172,7 @@ class SubredditAnalysis(object):
             # keeps track of how many users are remaining
             usersLeft = len(userList) - i - 1
 
-            print "({0} / {1}) users remaining.".format(usersLeft, len(userList))
+            self.add_msg("({0} / {1}) users remaining.".format(usersLeft, len(userList)))
 
             for comment in comments:
                 try:
@@ -314,7 +332,7 @@ def login(username, password):
                 exit(1)
 
         except HTTPError, e:
-            print e
+            myBot.add_msg(e)
             logging.debug(str(e) + "\n\n")
             
             if i == 2:
@@ -350,37 +368,37 @@ def check_subreddits(subredditList):
                         "".join(submission.title)
 
                 except (InvalidSubreddit, RedirectException) as e:
-                    print e
+                    myBot.add_msg(e)
                     logging.debug("Invalid subreddit. Removing from list." + str(e) + "\n\n")
                     subredditList.remove(subreddit)
                     raise skipThis
 
                 except HTTPError, e:
-                    print e
+                    myBot.add_msg(e)
                     logging.debug(str(subreddit) + ' ' + str(e) + "\n\n")
 
                     # private subreddits return a 403 error
                     if "403" in str(e):
-                        print "/r/{0} is private. Removing from list...".format(subreddit)
+                        myBot.add_msg("/r/{0} is private. Removing from list...".format(subreddit))
                         subredditList.remove(subreddit)
                         continue
 
                     # banned subreddits return a 404 error
                     if "404" in str(e):
-                        print "/r/{0} banned. Removing from list...".format(subreddit)
+                        myBot.add_msg("/r/{0} banned. Removing from list...".format(subreddit))
                         subredditList.remove(subreddit)
                         continue
 
-                    print "Waiting a minute to try again..."    
+                    myBot.add_msg("Waiting a minute to try again...")   
                     sleep(60)
                     raise skipThis
 
                 except (APIException, ClientException, Exception) as e:
-                    print e
+                    myBot.add_msg(e)
                     logging.debug(str(e) + "\n\n")
 
                     if str(e) == "timed out":
-                        print "Waiting to try again..."
+                        myBot.add_msg("Waiting to try again...")
                         sleep(60)
                         continue
 
@@ -406,44 +424,84 @@ def check_subreddits(subredditList):
 def main():
     
     # login credentials
-    # they can be overwritten with commandline arguments
+    # these can be overwritten with commandline arguments
     username = ""
     password = ""
 
     
     # commandline options for additional feature support
     parser = optparse.OptionParser("python redditanalysisbot.py [options]")
+    parser.add_option("--aB", "--addBan", dest="tgtBan", type="string", help="Add a subreddit to the ban list. Separate subreddits with commas.")
     parser.add_option("--aL", "--enableLogging", dest="enableLogging", type="string", help="Turn all logging on or off. On by default.")
     parser.add_option("-b", "--banList", dest="banOption", type="string", help="Turn the ban list on and off. On by default.")
     parser.add_option("--iL", "--infoLogging", dest="infoLogging", type="string", help="Turn raw data logging on and off. On by default.")
-    parser.add_option("-p", "--postHere", dest="SubredditName", type="string", help="Post to this subreddit.")
+    parser.add_option("-p", "--postHere", dest="SubredditName", type="string", help="Post to this subreddit. Defaults to /r/SubredditAnalysis")
     parser.add_option("--pL", "--postLogging", dest="postLogging", type="string", help="Turn post logging on and off. On by default.")
     parser.add_option("-s", "--scrapeLimit", dest="ScrapeLimit", type="int", help="Set the number of submissions to be scanned. 1000 by default.")
+    parser.add_option("-v", "--verbose", dest="verbosity", type="string", help="Make the program more verbose with status updates and print out errors. Defaults to off.")
     parser.add_option("-u", "--userCreds", dest="userCreds", type="string", help="Give the bot the username and password for a Reddit account. Separate them with a comma.")
+    parser.add_option("--uB", "--unBan", dest="tgtUnban", type="string", help="Remove a subreddit from the ban list. Separate subreddits with commas.")
     (options, args) = parser.parse_args()
 
     if options.enableLogging is not None:
-        if options.enableLogging.lower() == "off":
+        if options.enableLogging.lower() == "on":
+            myBot.infoLogging = True
+            myBot.postLogging = True
+
+        elif options.enableLogging.lower() == "off":
             myBot.infoLogging = False
             myBot.postLogging = False
+
+        else:
+            print "Invalid argument for logging. Use either \"on\" or \"off\"."
+            exit(1)
 
     if options.banOption is not None:
-        if options.banOption.lower() == "off":
+        if options.banOption.lower() == "on":
+            pass
+
+        elif options.banOption.lower() == "off":
             myBot.banList = []
 
+        else:
+            print "Invalid argument for logging. Use either \"on\" or \"off\"."
+            exit(1)
+
     if options.infoLogging is not None:
-        if options.infoLogging.lower() == "off":
+        if options.infoLogging.lower() == "on":
+            myBot.infoLogging = True
+
+        elif options.infoLogging.lower() == "off":
             myBot.infoLogging = False
 
+        else:
+            print "Invalid agument for logging. Use either \"on\" or \"off\"."
+            exit(1)
+
     if options.postLogging is not None:
-        if options.postLogging.lower() == "off":
+        if options.postLogging.lower() == "on":
+            myBot.postLogging = True
+
+        elif options.postLogging.lower() == "off":
             myBot.postLogging = False
 
-    if options.SubredditName is not None:
-        myBot.post_to = options.SubredditName
+        else:
+            print "Invalid argument for logging. Use either \"on\" or \"off\"."
+            exit(1)
 
     if options.ScrapeLimit is not None:
         myBot.scrapeLimit = options.ScrapeLimit
+
+    if options.verbosity is not None:
+        if options.verbosity.lower() == "on":
+            myBot.verbose = True
+
+        elif options.verbosity.lower() == "off":
+            myBot.verbose = False
+
+        else:
+            print "Invalid argument for verbosity. Use either \"on\" or \"off\"."
+            exit(1)
 
     if options.userCreds is not None:
         credentials = options.userCreds.split(',')
@@ -455,6 +513,36 @@ def main():
     print "Type \"quit\", \".quit\", or \'q\' to exit the program."
 
     login(username, password)
+
+    # these 3 require the client attribute, which is created
+    # in the login function
+    if options.tgtBan is not None:
+        checkList = options.tgtBan.split(',')
+
+        check_subreddits(checkList)
+
+        for element in checkList:
+            myBot.banList.append(element)
+
+    if options.SubredditName is not None:
+        checkList = [options.SubredditName]
+
+        check_subreddits(checkList)
+
+        if checkList == []:
+            print "Subreddit failed check. Can't post there."
+            exit(1)
+
+        else:
+            myBot.post_to = options.SubredditName
+
+    if options.tgtUnban is not None:
+        checkList = options.tgtUnban.split(',')
+
+        check_subreddits(checkList)
+
+        for element in checkList:
+            myBot.banList.remove(element)
 
     while True:
         # list of subreddits you want to analyze
@@ -479,24 +567,24 @@ def main():
                             break
 
                         except (InvalidSubreddit, RedirectException) as e:
-                            print e
+                            myBot.add_msg(e)
                             logging.debug("Invalid subreddit. Removing from list." + str(e) + "\n\n")
                             drilldownList.remove(subreddit)
                             raise skipThis
 
                         except HTTPError, e:
-                            print e
+                            myBot.add_msg(e)
                             logging.debug(str(e) + "\n\n")
-                            print "Waiting to try again..."
+                            myBot.add_msg("Waiting to try again...")
                             sleep(60)
                             continue
 
                         except (APIException, ClientException, Exception) as e:
-                            print e
+                            myBot.add_msg(e)
                             logging.debug(str(e) + "\n\n")
 
                             if str(e) == "timed out":
-                                print "Waiting to try again..."
+                                myBot.add_msg("Waiting to try again...")
                                 sleep(60)
                                 continue
 
@@ -521,18 +609,18 @@ def main():
                             break
 
                         except HTTPError, e:
-                            print e
+                            myBot.add_msg(e)
                             logging.debug(str(e) + "\n\n")
-                            print "Waiting to try again..."
+                            myBot.add_msg("Waiting to try again...")
                             sleep(60)
                             continue
 
                         except (APIException, ClientException, Exception) as e:
-                            print e
+                            myBot.add_msg(e)
                             logging.debug(str(e) + "\n\n")
 
                             if str(e) == "timed out":
-                                print "Waiting a minute to try again."
+                                myBot.add_msg("Waiting a minute to try again.")
                                 sleep(60)
                                 continue
 
@@ -563,7 +651,7 @@ def main():
                     text = myBot.format_post(subreddit, subredditTuple, userList)
 
                 except Exception, e:
-                    print e
+                    myBot.add_msg(e)
                     logging.debug("Failed to create tuples. " + str(e) + "\n\n")
                     continue
 
@@ -575,18 +663,18 @@ def main():
                             break
 
                         except HTTPError, e:
-                            print e
+                            myBot.add_msg(e)
                             logging.debug(str(e) + "\n\n")
-                            print "Waiting to try again..."
+                            myBot.add_msg("Waiting to try again...")
                             sleep(60)
                             continue
 
                         except (APIException, ClientException, Exception) as e:
-                            print e
+                            myBot.add_msg(e)
                             logging.debug(str(e) + "\n\n")
 
                             if str(e) == "timed out":
-                                print "Waiting to try again..."
+                                myBot.add_msg("Waiting to try again...")
                                 sleep(60)
                                 continue
 
@@ -609,23 +697,23 @@ def main():
                                 break
 
                             except ModeratorRequired, e:
-                                print e
+                                myBot.add_msg(e)
                                 logging.debug("Failed to set flair. " + str(e) + '\n' + str(submission.permalink) + "\n\n")
                                 raise skipThis
 
                             except HTTPError, e:
-                                print e
+                                myBot.add_msg(e)
                                 logging.debug(str(e) + "\n\n")
-                                print "Waiting to try again..."
+                                myBot.add_msg("Waiting to try again...")
                                 sleep(60)
                                 continue
 
                             except (APIException, ClientException, Exception) as e:
-                                print e
+                                myBot.add_msg(e)
                                 logging.debug(str(e) + "\n\n")
 
                                 if str(e) == "timed out":
-                                    print "Waiting to try again..."
+                                    myBot.add_msg("Waiting to try again...")
                                     sleep(60)
                                     continue
 
@@ -640,7 +728,10 @@ def main():
 if __name__ == "__main__":
     myBot = SubredditAnalysis()
 
-    # set these to False if you don't want logs
+    # comment this out if you want minimal terminal output
+    myBot.verbose = True
+
+    # comment these out if you don't want logging
     myBot.infoLogging = True
     errorLogging = True
     myBot.postLogging = True
