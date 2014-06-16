@@ -12,7 +12,7 @@ Requirements
 ###Install Dependencies
 In order to run the bot, you must install some necessary packages. To do so, run this command:
 
-    pip install requirements.txt
+    pip install -r requirements.txt
     
 Commandline Flags
 -----------------
