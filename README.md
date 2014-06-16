@@ -14,6 +14,10 @@ In order to run the bot, you must install some necessary packages. To do so, run
 
     pip install -r requirements.txt
     
+Linux users may need to use:
+    
+    sudo pip install -r requirements.txt
+    
 Commandline Flags
 -----------------
 
