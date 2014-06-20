@@ -122,7 +122,7 @@ class SubredditAnalysis(object):
 
             # get the comment authors and append
             # them to userList for scanning
-            for comment in praw.helpers.flatten_tree(submission._comments):
+            for comment in praw.helpers.flatten_tree(submission.comments):
                 try:
                     commenter = str(comment.author)
 
