@@ -56,7 +56,7 @@ class SubredditAnalysis(object):
             "Showerthoughts", "space", "sports", "technology",
             "television", "tifu", "todayilearned",
             "TwoXChromosomes", "UpliftingNews", "videos",
-            "worldnews", "WritingPrompts", "WTF"
+            "worldnews", "WritingPrompts", "WTF", "leagueoflegends"
         ]
 
     def add_msg(self, msg=None, newline=False):
@@ -285,6 +285,13 @@ class SubredditAnalysis(object):
         dbFile1 = "{0}.db".format(subreddit1)
         dbFile2 = "{0}.db".format(subreddit2)
 
+        # so these are defined in case that sub1 or sub2 don't 
+        # show up in the drilldown for one of them they can be
+        # set equal to each other so the program can calculate the
+        # similarity between the 2 subsreddits.
+        AB = None
+        BA = None
+
         # if a drilldown for this subreddit hasn't been done then do it
         if(os.path.isfile(dbFile1) == False):
            userList = self.get_users(subreddit1)
@@ -293,10 +300,14 @@ class SubredditAnalysis(object):
            self.add_db(subreddit1, subredditTuple, len(userList))
 
         if(os.path.isfile(dbFile2) == False):
-           userList = self.get_users(subreddit2)
-           subredditList = self.get_subs(userList)
-           subredditTuple = self.create_tuples(subreddit2, subredditList)
-           self.add_db(subreddit2, subredditTuple, len(userList))
+            if subreddit2 not in self.banList:
+                userList = self.get_users(subreddit2)
+                subredditList = self.get_subs(userList)
+                subredditTuple = self.create_tuples(subreddit2, subredditList)
+                self.add_db(subreddit2, subredditTuple, len(userList))
+
+            else:
+                raise skipThis
 
         # Query statements need strings fed in tuples
         sub1 = (subreddit1,)
@@ -313,7 +324,7 @@ class SubredditAnalysis(object):
             AB = operator.getitem(overlap, 0)
 
         # get the total number of users found in subreddit2
-        cur1.execute("SELECT users FROM drilldown WHERE overlaps=?", sub2)
+        cur1.execute("SELECT users FROM drilldown WHERE overlaps=?", sub1)
 
         for userCount in cur1:
             A = operator.getitem(userCount, 0)
@@ -331,7 +342,13 @@ class SubredditAnalysis(object):
         for overlap in cur2:
             BA = operator.getitem(overlap, 0)
 
-        cur2.execute("SELECT users FROM drilldown WHERE overlaps=?", sub1)
+        if AB is None:
+            AB = BA
+
+        if BA is None:
+            BA = AB
+
+        cur2.execute("SELECT users FROM drilldown WHERE overlaps=?", sub2)
 
         for userCount in cur2:
             B = operator.getitem(userCount, 0)
@@ -344,7 +361,7 @@ class SubredditAnalysis(object):
         return (subreddit2, similarity)
 
 
-    def format_post(self, subreddit, subredditTuple, userList):
+    def format_post(self, subreddit, userList):
         """
         This function formats the data in order to submit it to
         Reddit. It takes 3 arguments. The first is the subreddit
@@ -366,33 +383,56 @@ class SubredditAnalysis(object):
 
         self.bodyContent = ""
 
-        for i in range(0, len(subredditTuple)):
-            subreddit2 = "".join(subredditTuple[i][0])
+        dbFile = "{0}.db".format(subreddit)
+
+        con = db.connect(dbFile)
+        cur = con.cursor()
+
+        cur.execute("SELECT * FROM drilldown")
+
+        for row in cur:
+            subreddit2 = operator.getitem(row, 0)
+
+            if subreddit2 == subreddit:
+                continue
+
+            if subreddit2 in self.banList:
+                continue
+
             similarity = self.calculate_similarity(subreddit, subreddit2)
             self.simList.append(similarity)
 
         self.simList.sort(key=operator.itemgetter(1), reverse=True)
 
-        for i in range(0, len(self.simList)):
-            sub = "".join(self.simList[i][0])
-            sim = "".join(self.simList[i][1])
+        # fill in the table
+        for element in self.simList:
+            sub = operator.getitem(element, 0)
+            sim = operator.getitem(element, 1)
             self.bodyContent += "|/r/{0}|{1}|\n".format(sub, sim)
 
             if len(self.bodyStart + self.bodyContent) >= 500:
                 break
 
-        self.bodyContent += "\nOf {0} Users Found:\n\n".format(len(userList))
+        if type(userList) == list:
+            userList = len(userList)
+
+        self.bodyContent += "\nOf {0} Users Found:\n\n".format(userList)
         self.bodyContent += "| Subreddit | Overlapping users |\n"
         self.bodyContent += "|:------|------:|\n"
 
-        # fill in the table
-        for i in range(0, len(subredditTuple)):
-            sub = "".join(subredditTuple[i][0])
-            overlap = "".join(str(subredditTuple[i][1]))
+        cur.execute("SELECT * FROM drilldown")
+
+        for row in cur:
+            sub = operator.getitem(row, 0)
+
+            if sub == subreddit:
+                continue
+
+            overlap = operator.getitem(row, 1)
             self.bodyContent += "|/r/{0}|{1}|\n".format(sub, overlap)
 
             if len(self.bodyStart + self.bodyContent) >= 9900:
-                # so the table doesn't get too big to post
+                # so the drilldown doesn't get too big to post
                 break
 
         text = self.bodyStart + self.bodyContent
@@ -690,9 +730,105 @@ def main():
         # iterate through the drilldownList to get data
         for subreddit in drilldownList:
 
+            # check to see if a drilldown for this subreddit
+            # was already done
+            dbFile = "{0}.db".format(subreddit)
+
             if(subreddit in ["quit", ".quit", 'q']):
                 print "Quitting..."
                 exit(0)
+
+            elif(os.path.isfile(dbFile)):
+                con = db.connect(dbFile)
+                cur = con.cursor()
+
+                sub = (subreddit,)
+
+                cur.execute("SELECT users FROM drilldown WHERE overlaps=?", sub)
+
+                for element in cur:
+                    userList = operator.getitem(element, 0)
+
+                try:
+                    # format the data for Reddit
+                    text = myBot.format_post(subreddit, userList)
+                
+                except Exception, e:
+                    myBot.add_msg(e)
+                    logging.debug("Failed to format post. " + str(e) + "\n\n")
+                    continue
+
+                try:
+                    while True:
+                        try:
+                            # submit the post for Reddit
+                            post = myBot.submit_post(subreddit, text)
+                            break
+
+                        except HTTPError, e:
+                            myBot.add_msg(e)
+                            logging.debug(str(e) + "\n\n")
+                            myBot.add_msg("Waiting to try again...")
+                            sleep(60)
+                            continue
+
+                        except (APIException, ClientException, Exception) as e:
+                            myBot.add_msg(e)
+                            logging.debug(str(e) + "\n\n")
+
+                            if str(e) == "timed out":
+                                myBot.add_msg("Waiting to try again...")
+                                sleep(60)
+                                continue
+
+                            else:
+                                raise skipThis
+
+                except skipThis:
+                    print "Couldn't submit post. Skipping..."
+                    logging.debug(str(e) + "\n\n")
+                    myBot.log_post(subreddit, text)
+                    continue
+
+                if(post != None):
+                    try:
+                        for i in range(0, 3):
+                            # this requires mod privileges
+                            try:
+                                print "Setting post's flair..."
+                                myBot.client.set_flair(myBot.post_to, post, flair_text=subreddit)
+                                break
+
+                            except ModeratorRequired, e:
+                                myBot.add_msg(e)
+                                logging.debug("Failed to set flair. " + str(e) + '\n' + str(submission.permalink) + "\n\n")
+                                raise skipThis
+
+                            except HTTPError, e:
+                                myBot.add_msg(e)
+                                logging.debug(str(e) + "\n\n")
+                                myBot.add_msg("Waiting to try again...")
+                                sleep(60)
+                                continue
+
+                            except (APIException, ClientException, Exception) as e:
+                                myBot.add_msg(e)
+                                logging.debug(str(e) + "\n\n")
+
+                                if str(e) == "timed out":
+                                    myBot.add_msg("Waiting to try again...")
+                                    sleep(60)
+                                    continue
+
+                                else:
+                                    raise skipThis
+
+                    except skipThis:
+                        print "Couldn't assign flair. Skipping..."
+                        continue
+
+                con.close()
+                continue
 
             else:
                 try:
@@ -798,7 +934,7 @@ def main():
 
                 try:
                     # format the data for Reddit
-                    text = myBot.format_post(subreddit, subredditTuple, userList)
+                    text = myBot.format_post(subreddit, userList)
                 
                 except Exception, e:
                     myBot.add_msg(e)
