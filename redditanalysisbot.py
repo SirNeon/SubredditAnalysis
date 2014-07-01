@@ -1,13 +1,16 @@
 from collections import Counter
 from datetime import datetime
 import logging
+from math import sqrt
 import operator
 import optparse
+import os
 from sys import exit, stderr
 from time import sleep
 import praw
 from praw.errors import *
 from requests.exceptions import HTTPError
+import sqlite3 as db
 
 
 class SubredditAnalysis(object):
@@ -55,7 +58,6 @@ class SubredditAnalysis(object):
             "TwoXChromosomes", "UpliftingNews", "videos",
             "worldnews", "WritingPrompts", "WTF"
         ]
-
 
     def add_msg(self, msg=None, newline=False):
         """
@@ -158,7 +160,7 @@ class SubredditAnalysis(object):
         # to get their comments for crossreferencing
         for i, user in enumerate(userList):
             try:
-                comments = self.client.get_redditor(user).get_comments('all')
+                comments = self.client.get_redditor(user).get_comments(limit=100)
 
             # handle shadowbanned/deleted accounts
             except HTTPError, e:
@@ -202,8 +204,7 @@ class SubredditAnalysis(object):
         is the subreddit that is being targeted for the drilldown.
         The second is the list of subreddits which will be put
         into tuples for storage. It returns a list of tuples that
-        contains the subreddit, the overlapping users, and their
-        net karma.
+        contains the subreddit and the overlapping users.
         """
 
         print "Creating tuples..."
@@ -229,6 +230,120 @@ class SubredditAnalysis(object):
         return self.subredditTuple
 
 
+    def add_db(self, subreddit, subredditTuple, userCount):
+        """
+        Iterates through a list of tuples which contain the name 
+        of a subreddit and the amount of overlapping users. It takes 
+        two arguments. The first is the subreddit which drilldown this 
+        is for. The second is the collected list of tuples which 
+        contain the overlapping subreddits and the amount of 
+        overlapping users.
+        """
+
+        print "Adding data to database..."
+
+        dbFile = "{0}.db".format(subreddit)
+
+        if(os.path.isfile(dbFile)):
+            pass
+
+        else:
+
+            # connect to the database file
+            con = db.connect(dbFile)
+        
+            # create the cursor object for the database
+            cur = con.cursor()
+
+            # make a table if it doesn't exist already
+            cur.execute("CREATE TABLE IF NOT EXISTS drilldown(overlaps TEXT, users INT)")
+
+            cur.execute("INSERT INTO drilldown VALUES(?, ?)", (subreddit, userCount))
+
+            # store data from the tuples into the database
+            for element in subredditTuple:
+                subName = operator.getitem(element, 0)
+                users = operator.getitem(element, 1)
+
+                cur.execute("INSERT INTO drilldown VALUES(?, ?)", (subName, users))
+
+            con.commit()
+            con.close()
+
+
+    def calculate_similarity(self, subreddit1, subreddit2):
+        """
+        Calculates the similarity between two subreddits. Give it the
+        two subreddits to compare. Returns the similarity as a tuple 
+        with subreddit2 as the first element and the similarity as 
+        the second element.
+        """
+
+        print "Calculating similarity..."
+
+        # format the file names
+        dbFile1 = "{0}.db".format(subreddit1)
+        dbFile2 = "{0}.db".format(subreddit2)
+
+        # if a drilldown for this subreddit hasn't been done then do it
+        if(os.path.isfile(dbFile1) == False):
+           userList = self.get_users(subreddit1)
+           subredditList = self.get_subs(userList)
+           subredditTuple = self.create_tuples(subreddit1, subredditList)
+           self.add_db(subreddit1, subredditTuple, len(userList))
+
+        if(os.path.isfile(dbFile2) == False):
+           userList = self.get_users(subreddit2)
+           subredditList = self.get_subs(userList)
+           subredditTuple = self.create_tuples(subreddit2, subredditList)
+           self.add_db(subreddit2, subredditTuple, len(userList))
+
+        # Query statements need strings fed in tuples
+        sub1 = (subreddit1,)
+        sub2 = (subreddit2,)
+
+        # open the database for subreddit 1
+        con1 = db.connect(dbFile1)
+        cur1 = con1.cursor()
+
+        # get the number of overlapping users from subreddit2
+        cur1.execute("SELECT users FROM drilldown WHERE overlaps=?", sub2)
+
+        for overlap in cur1:
+            AB = operator.getitem(overlap, 0)
+
+        # get the total number of users found in subreddit2
+        cur1.execute("SELECT users FROM drilldown WHERE overlaps=?", sub2)
+
+        for userCount in cur1:
+            A = operator.getitem(userCount, 0)
+
+        # close subreddit1's database file
+        con1.close()
+
+        # open the database for subreddit2
+        con2 = db.connect(dbFile2)
+        cur2 = con2.cursor()
+
+        # do the same thing for subreddit1 and was done for subreddit2
+        cur2.execute("SELECT users FROM drilldown WHERE overlaps=?", sub1)
+
+        for overlap in cur2:
+            BA = operator.getitem(overlap, 0)
+
+        cur2.execute("SELECT users FROM drilldown WHERE overlaps=?", sub1)
+
+        for userCount in cur2:
+            B = operator.getitem(userCount, 0)
+
+        con2.close()
+
+        # use the retrieved data to calculate similarity
+        similarity = "%.05f" % ((sqrt(AB * BA)) / (sqrt(float(A * B))))
+        
+        return (subreddit2, similarity)
+
+
     def format_post(self, subreddit, subredditTuple, userList):
         """
         This function formats the data in order to submit it to
@@ -241,13 +356,34 @@ class SubredditAnalysis(object):
 
         print "Formatting post..."
 
+        # similarity values will be stored here for sorting
+        self.simList = []
+
         # make a table
         self.bodyStart = "## /r/{0} Drilldown\n\n".format(subreddit)
-        self.bodyStart += "Of {0} Users Found:\n\n".format(len(userList))
-        self.bodyStart += "| Subreddit | Overlapping users |\n"
+        self.bodyStart += "| Subreddit | Similarity |\n"
         self.bodyStart += "|:------|------:|\n"
 
         self.bodyContent = ""
+
+        for i in range(0, len(subredditTuple)):
+            subreddit2 = "".join(subredditTuple[i][0])
+            similarity = self.calculate_similarity(subreddit, subreddit2)
+            self.simList.append(similarity)
+
+        self.simList.sort(key=operator.itemgetter(1), reverse=True)
+
+        for i in range(0, len(self.simList)):
+            sub = "".join(self.simList[i][0])
+            sim = "".join(self.simList[i][1])
+            self.bodyContent += "|/r/{0}|{1}|\n".format(sub, sim)
+
+            if len(self.bodyStart + self.bodyContent) >= 500:
+                break
+
+        self.bodyContent += "\nOf {0} Users Found:\n\n".format(len(userList))
+        self.bodyContent += "| Subreddit | Overlapping users |\n"
+        self.bodyContent += "|:------|------:|\n"
 
         # fill in the table
         for i in range(0, len(subredditTuple)):
@@ -647,13 +783,28 @@ def main():
 
                     myBot.log_info("\n\n")
 
-                    # format the data for Reddit
-                    text = myBot.format_post(subreddit, subredditTuple, userList)
-
                 except Exception, e:
                     myBot.add_msg(e)
                     logging.debug("Failed to create tuples. " + str(e) + "\n\n")
                     continue
+
+                try:
+                    myBot.add_db(subreddit, subredditTuple, len(userList))
+
+                except Exception, e:
+                    myBot.add_msg(e)
+                    logging.debug("Failed to add to database. " + str(e) + "\n\n")
+                    continue
+
+                try:
+                    # format the data for Reddit
+                    text = myBot.format_post(subreddit, subredditTuple, userList)
+                
+                except Exception, e:
+                    myBot.add_msg(e)
+                    logging.debug("Failed to format post. " + str(e) + "\n\n")
+                    continue
+
 
                 try:
                     while True:
