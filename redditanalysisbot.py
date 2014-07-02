@@ -5,12 +5,13 @@ from math import sqrt
 import operator
 import optparse
 import os
+import sqlite3 as db
 from sys import exit, stderr
 from time import sleep
 import praw
 from praw.errors import *
 from requests.exceptions import HTTPError
-import sqlite3 as db
+from simpleconfigparser import simpleconfigparser
 
 
 class SubredditAnalysis(object):
@@ -21,43 +22,57 @@ class SubredditAnalysis(object):
         Initialize the class with some basic attributes.
         """
 
+        # check for a banlist.txt file
+        if(os.path.isfile("banlist.txt") == False):
+            print "Could not find banlist.txt."
+
+        # check for settings.cfg file
+        if(os.path.isfile("settings.cfg") == False):
+            raise settings.missing("Could not find settings.cfg.")
+
+        # needed to read the settings.cfg file
+        self.config = simpleconfigparser()
+
+        self.config.read("settings.cfg")
+
         # add terminal output
-        self.verbose = False
+        self.verbose = self.config.main.getboolean("verbose")
 
         # maximum threads to crawl. Reddit doesn't
         # like it when you go over 1000
-        self.scrapeLimit = 1000
+        self.scrapeLimit = int(self.config.main.scrapeLimit)
 
         # post drilldown to this subreddit
-        self.post_to = "SubredditAnalysis"
+        self.post_to = self.config.main.post_to
 
         self.useragent = "Reddit Analysis Bot by /u/SirNeon"
 
         # optional logging
-        self.infoLogging = False
-        self.postLogging = False
+        self.infoLogging = self.config.logging.getboolean("infoLogging")
+        self.postLogging = self.config.logging.getboolean("postLogging")
+        self.errorLogging = self.config.logging.getboolean("errorLogging")
 
-        # I've banned defaults and former defaults since
-        # there's bound to be overlap with those due to
-        # how Reddit autosubscribes users to them
-        self.banList = [
-            "AdviceAnimals", "announcements", "Art", "atheism",
-            "AskReddit", "askscience", "aww", "bestof",
-            "blog", "books", "creepy", "dataisbeautiful",
-            "DIY", "Documentaries", "EarthPorn",
-            "explainlikeimfive", "Fitness", "food", "funny",
-            "Futurology", "gadgets", "gaming", "GetMotivated",
-            "gifs", "history", "IAmA", "InternetIsBeautiful",
-            "Jokes", "LifeProTips", "listentothis",
-            "mildlyinteresting", "movies", "Music", "news",
-            "nosleep", "nottheonion", "OldSchoolCool",
-            "personalfinance", "philosophy",
-            "photoshopbattles", "pics", "politics", "science",
-            "Showerthoughts", "space", "sports", "technology",
-            "television", "tifu", "todayilearned",
-            "TwoXChromosomes", "UpliftingNews", "videos",
-            "worldnews", "WritingPrompts", "WTF", "leagueoflegends"
-        ]
+        # I've banned subreddits with more than 300,000 subscribers
+        # since they show up everywhere due to being so freaking huge
+        # they also take forever to scan. /r/Games produced over 
+        # 40,000 unique users in 1,000 threads, which would take DAYS
+        # to do. So yeah.
+        self.banList = []
+
+        # list of users found in the target subreddit
+        self.userList = []
+
+        # list of overlapping subreddits
+        self.subredditList = []
+
+        if(self.config.main.getboolean("banList")):
+            bans = open("banlist.txt", 'r')
+
+            for subreddit in bans.readlines():
+                subreddit = subreddit.strip('\n')
+                self.banList.append(subreddit)
+
+            bans.close()
 
     def add_msg(self, msg=None, newline=False):
         """
@@ -100,9 +115,6 @@ class SubredditAnalysis(object):
 
         # get threads from the hot list
         submissions = self.client.get_subreddit(subreddit).get_hot(limit=self.scrapeLimit)
-
-        # userbase in the selected subreddit to be scanned
-        self.userList = []
 
         # get the thread creator and if he's not
         # in the userList then add him there
@@ -150,9 +162,6 @@ class SubredditAnalysis(object):
 
         print "Scanning for overlapping subreddits..."
 
-        # list of overlapping subreddits
-        subredditList = []
-
         # keeps count on overlapping users
         self.counter = Counter()
 
@@ -191,11 +200,11 @@ class SubredditAnalysis(object):
 
                 # add the ones that aren't kept in the list
                 # to the list of subreddits
-                if csubreddit not in subredditList:
+                if csubreddit not in self.subredditList:
                     if csubreddit not in self.banList:
-                        subredditList.append(csubreddit)
+                        self.subredditList.append(csubreddit)
 
-        return subredditList
+        return self.subredditList
 
 
     def create_tuples(self, subreddit, subredditList):
@@ -294,16 +303,63 @@ class SubredditAnalysis(object):
 
         # if a drilldown for this subreddit hasn't been done then do it
         if(os.path.isfile(dbFile1) == False):
-           userList = self.get_users(subreddit1)
-           subredditList = self.get_subs(userList)
-           subredditTuple = self.create_tuples(subreddit1, subredditList)
-           self.add_db(subreddit1, subredditTuple, len(userList))
+            while True:
+                try:
+                    userList = self.get_users(subreddit1)
+                    break
+
+                except HTTPError, e:
+                    self.add_msg(e)
+                    continue
+            
+            while True:
+                try:
+                    subredditList = self.get_subs(userList)
+                    break
+
+                except HTTPError, e:
+                    self.add_msg(e)
+                    continue
+
+            while True:
+                try:
+                    subredditTuple = self.create_tuples(subreddit1, subredditList)
+                    break
+
+                except HTTPError, e:
+                    self.add_msg(e)
+                    continue
+
+            self.add_db(subreddit1, subredditTuple, len(userList))
 
         if(os.path.isfile(dbFile2) == False):
             if subreddit2 not in self.banList:
-                userList = self.get_users(subreddit2)
-                subredditList = self.get_subs(userList)
-                subredditTuple = self.create_tuples(subreddit2, subredditList)
+                while True:
+                    try:
+                        userList = self.get_users(subreddit2)
+                        break
+
+                    except HTTPError, e:
+                        self.add_msg(e)
+                        continue
+
+                while True:
+                    try:
+                        subredditList = self.get_subs(userList)
+                        break
+
+                    except HTTPError, e:
+                        self.add_msg(e)
+                        continue
+                
+                while True:
+                    try:
+                        subredditTuple = self.create_tuples(subreddit2, subredditList)
+                        break
+
+                    except HTTPError, e:
+                        self.add_msg(e)
+
                 self.add_db(subreddit2, subredditTuple, len(userList))
 
             else:
@@ -492,6 +548,14 @@ class SubredditAnalysis(object):
             self.postFile.close()
 
 
+class settings(Exception):
+
+
+    def missing(self):
+        print "Could not find settings.cfg. Exiting..."
+        exit(1)
+
+
 class skipThis(Exception):
     pass
 
@@ -601,8 +665,8 @@ def main():
     
     # login credentials
     # these can be overwritten with commandline arguments
-    username = ""
-    password = ""
+    username = myBot.config.login.username
+    password = myBot.config.login.password
 
     
     # commandline options for additional feature support
@@ -634,7 +698,13 @@ def main():
 
     if options.banOption is not None:
         if options.banOption.lower() == "on":
-            pass
+            bans = open("banlist.txt", 'r')
+
+            for subreddit in bans.readlines():
+                subreddit = subreddit.strip('\n')
+                myBot.banList.append(subreddit)
+
+            bans.close()
 
         elif options.banOption.lower() == "off":
             myBot.banList = []
@@ -836,6 +906,7 @@ def main():
                         # get the list of users
                         try:
                             userList = myBot.get_users(subreddit)
+                            myBot.userList = []
                             break
 
                         except (InvalidSubreddit, RedirectException) as e:
@@ -878,6 +949,7 @@ def main():
                         try:
                             # get the list of subreddits
                             subredditList = myBot.get_subs(userList)
+                            myBot.subredditList = []
                             break
 
                         except HTTPError, e:
@@ -1015,15 +1087,7 @@ def main():
 if __name__ == "__main__":
     myBot = SubredditAnalysis()
 
-    # comment this out if you want minimal terminal output
-    myBot.verbose = True
-
-    # comment these out if you don't want logging
-    myBot.infoLogging = True
-    errorLogging = True
-    myBot.postLogging = True
-
-    if(errorLogging):
+    if(myBot.errorLogging):
         logging.basicConfig(
             filename="SubredditAnalysis_logerr.log", 
             filemode='a', format="%(asctime)s\nIn "
