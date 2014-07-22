@@ -551,8 +551,8 @@ class SubredditAnalysis(object):
 class settings(Exception):
 
 
-    def missing(self):
-        print "Could not find settings.cfg. Exiting..."
+    def missing(self, error):
+        print error
         exit(1)
 
 
