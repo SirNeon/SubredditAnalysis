@@ -8,6 +8,7 @@ Requirements
 * Python 2.7
 * Praw
 * Requests
+* SimpleConfigParser
 
 ###Install Dependencies
 In order to run the bot, you must install some necessary packages. To do so, run this command:
