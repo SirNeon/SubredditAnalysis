@@ -29,7 +29,7 @@ class SubredditAnalysis(object):
 
         # check for settings.cfg file
         if(os.path.isfile("settings.cfg") == False):
-            raise settings.missing(settings, "Could not find settings.cfg.")
+            raise settings.missing("Could not find settings.cfg.")
 
         # needed to read the settings.cfg file
         self.config = simpleconfigparser()
