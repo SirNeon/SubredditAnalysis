@@ -422,7 +422,7 @@ class SubredditAnalysis(object):
                         self.subredditTuple = []
                         break
 
-                    except HTTPError, e:
+                    except HTTPError as e:
                         self.add_msg(e)
 
                 self.add_db(subreddit2, subredditTuple, len(userList))
@@ -605,10 +605,10 @@ class SubredditAnalysis(object):
                     self.add_msg(e)
                     continue
 
-                except ModeratorRequired, e:
+                except ModeratorRequired as e:
                     self.add_msg(e)
                     logging.error("Failed to set flair. " + str(e) + '\n' + str(submission.permalink) + "\n\n")
-                    raise skipThis.error(skipThis, "Could not assign flair. Moderator privileges are necessary.")
+                    raise skipThis.error("Could not assign flair. Moderator privileges are necessary.")
     
 
     def log_info(self, info):
@@ -646,7 +646,7 @@ class SubredditAnalysis(object):
 class settings(Exception):
 
 
-    def missing(self, error=None, newline=False):
+    def missing(error=None, newline=False):
         """
         Exception raised when settings.cfg isn't detected. 
         error should be a string. Optional newline as well.
@@ -665,7 +665,7 @@ class settings(Exception):
 class skipThis(Exception):
     
 
-    def error(self, error=None, newline=False):
+    def error(error=None, newline=False):
         """
         Print out an error message. error should be a string. 
         Optional newline as well.
@@ -677,8 +677,6 @@ class skipThis(Exception):
             if(newline):
                 print('\n')
 
-            
-
 
 def login(username, password):
     for i in range(0, 3):
@@ -687,12 +685,12 @@ def login(username, password):
             break
 
         except (InvalidUser, InvalidUserPass, RateLimitExceeded, APIException) as e:
-                myBot.add_msg(str(e))
+                myBot.add_msg(e)
                 logging.error(str(e) + "\n\n")
                 sys.exit(1)
 
         except (HTTPError, timeout) as e:
-            myBot.add_msg(str(e))
+            myBot.add_msg(e)
             logging.error(str(e) + "\n\n")
             
             if i == 2:
@@ -729,13 +727,13 @@ def check_subreddits(subredditList):
                         "".join(submission.title)
 
                 except (InvalidSubreddit, RedirectException) as e:
-                    myBot.add_msg(str(e))
+                    myBot.add_msg(e)
                     logging.error("Invalid subreddit. Removing from list." + str(e) + "\n\n")
                     subredditList.remove(subreddit)
-                    raise skipThis.error(skipThis, str(e))
+                    raise skipThis.error(str(e))
 
                 except (HTTPError, timeout) as e:
-                    myBot.add_msg(str(e))
+                    myBot.add_msg(e)
                     logging.error(str(subreddit) + ' ' + str(e) + "\n\n")
 
                     # private subreddits return a 403 error
@@ -752,12 +750,12 @@ def check_subreddits(subredditList):
 
                     myBot.add_msg("Waiting a minute to try again...")   
                     sleep(60)
-                    raise skipThis.error(skipThis, str(e))
+                    raise skipThis.error(str(e))
 
                 except (APIException, ClientException, Exception) as e:
-                    myBot.add_msg(str(e))
+                    myBot.add_msg(e)
                     logging.error(str(e) + "\n\n")
-                    raise skipThis.error(skipThis, str(e))
+                    raise skipThis.error(str(e))
 
             break
 
@@ -945,8 +943,8 @@ def main():
                     # format the data for Reddit
                     text = myBot.format_post(subreddit, userList)
                 
-                except Exception, e:
-                    myBot.add_msg(str(e))
+                except Exception as e:
+                    myBot.add_msg(e)
                     logging.error("Failed to format post. " + str(e) + "\n\n")
                     continue
 
@@ -958,16 +956,16 @@ def main():
                             break
 
                         except (HTTPError, timeout) as e:
-                            myBot.add_msg(str(e))
+                            myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
                             myBot.add_msg("Waiting to try again...")
                             sleep(60)
                             continue
 
                         except (APIException, ClientException, Exception) as e:
-                            myBot.add_msg(str(e))
+                            myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(skipThis, str(e))
+                            raise skipThis.error(str(e))
 
                 except skipThis:
                     logging.error(str(e) + "\n\n")
@@ -981,9 +979,9 @@ def main():
                             myBot.give_flair(post, subreddit)
 
                         except (APIException, ClientException, Exception) as e:
-                            myBot.add_msg(str(e))
+                            myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(skipThis, str(e))
+                            raise skipThis.error(str(e))
 
                     except skipThis:
                         continue
@@ -1001,15 +999,15 @@ def main():
                             break
 
                         except (InvalidSubreddit, RedirectException) as e:
-                            myBot.add_msg(str(e))
+                            myBot.add_msg(e)
                             logging.error("Invalid subreddit. Removing from list." + str(e) + "\n\n")
                             drilldownList.remove(subreddit)
-                            raise skipThis.error(skipThis, str(e))
+                            raise skipThis.error(str(e))
 
                         except (APIException, ClientException, Exception) as e:
-                            myBot.add_msg(str(e))
+                            myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(skipThis, str(e))
+                            raise skipThis.error(str(e))
 
                 except skipThis:
                     continue
@@ -1029,9 +1027,9 @@ def main():
                             break
 
                         except (APIException, ClientException, Exception) as e:
-                            myBot.add_msg(str(e))
+                            myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(skipThis, str(e))
+                            raise skipThis.error(str(e))
 
                 except skipThis:
                     continue
@@ -1052,16 +1050,16 @@ def main():
 
                     myBot.log_info("\n\n")
 
-                except Exception, e:
-                    myBot.add_msg(str(e))
+                except Exception as e:
+                    myBot.add_msg(e)
                     logging.error("Failed to create tuples. " + str(e) + "\n\n")
                     continue
 
                 try:
                     myBot.add_db(subreddit, subredditTuple, len(userList))
 
-                except Exception, e:
-                    myBot.add_msg(str(e))
+                except Exception as e:
+                    myBot.add_msg(e)
                     logging.error("Failed to add to database. " + str(e) + "\n\n")
                     continue
 
@@ -1069,8 +1067,8 @@ def main():
                     # format the data for Reddit
                     text = myBot.format_post(subreddit, userList)
                 
-                except Exception, e:
-                    myBot.add_msg(str(e))
+                except Exception as e:
+                    myBot.add_msg(e)
                     logging.error("Failed to format post. " + str(e) + "\n\n")
                     continue
 
@@ -1083,16 +1081,16 @@ def main():
                             break
 
                         except (HTTPError, timeout) as e:
-                            myBot.add_msg(str(e))
+                            myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
                             myBot.add_msg("Waiting to try again...")
                             sleep(60)
                             continue
 
                         except (APIException, ClientException, Exception) as e:
-                            myBot.add_msg(str(e))
+                            myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(skipThis, str(e))
+                            raise skipThis.error(str(e))
 
                 except skipThis:
                     logging.error(str(e) + "\n\n")
@@ -1102,19 +1100,19 @@ def main():
                 if(post != None):
                     try:
                         try:
-                            print("Setting post's flair...\n")
+                            print("Setting post's flair...")
                             
                             myBot.give_flair(post, subreddit)
 
-                        except ModeratorRequired, e:
-                            myBot.add_msg(str(e))
+                        except ModeratorRequired as e:
+                            myBot.add_msg(e)
                             logging.error("Failed to set flair. " + str(e) + '\n' + str(post.permalink) + "\n\n")
-                            raise skipThis.error(skipThis, str(e))
+                            raise skipThis.error(str(e))
 
                         except (APIException, ClientException, Exception) as e:
-                            myBot.add_msg(str(e))
+                            myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(skipThis, str(e))
+                            raise skipThis.error(str(e))
 
                     except skipThis:
                         continue
