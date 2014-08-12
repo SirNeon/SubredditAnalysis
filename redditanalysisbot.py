@@ -25,12 +25,11 @@ class SubredditAnalysis(object):
 
         # check for a banlist.txt file
         if(os.path.isfile("banlist.txt") == False):
-            sys.stdout.write("Could not find banlist.txt.\n")
-            sys.stdout.flush()
+            print("Could not find banlist.txt.")
 
         # check for settings.cfg file
         if(os.path.isfile("settings.cfg") == False):
-            raise settings.missing("Could not find settings.cfg.")
+            raise settings.missing(settings, "Could not find settings.cfg.")
 
         # needed to read the settings.cfg file
         self.config = simpleconfigparser()
@@ -83,23 +82,20 @@ class SubredditAnalysis(object):
                     subreddit = subreddit.strip('\n')
                     self.banList.append(subreddit)
 
-    def add_msg(self, msg=None, newline=True):
+    def add_msg(self, msg=None, newline=False):
         """
         Simple function to make terminal output optional. Feed
         it the message to print out. Can also tell it to print a 
         newline if you want to.
         """
 
-        # This uses sys.stdout.write() instead of print
-        # so that the bot is compatible with both python2 and 3
         if(self.verbose):
             if msg is not None:
-                sys.stdout.write(msg)
+                print(msg)
 
             if(newline):
-                sys.stdout.write('\n')
+                print('\n')
 
-            sys.stdout.flush()
 
 
     def login(self, username, password):
@@ -109,12 +105,12 @@ class SubredditAnalysis(object):
         """
 
         self.client = praw.Reddit(user_agent=self.useragent)
-        sys.stdout.write("Logging in as {0}...\n".format(username))
-        sys.stdout.flush()
+        print("Logging in as {0}...".format(username))
+        
 
         self.client.login(username, password)
-        sys.stdout.write("Login successful.\n")
-        sys.stdout.flush()
+        print("Login successful.")
+        
 
 
     def get_users(self, subreddit):
@@ -126,8 +122,7 @@ class SubredditAnalysis(object):
         It returns a list of users.
         """
 
-        sys.stdout.write("Getting users for /r/{0}...\n".format(subreddit))
-        sys.stdout.flush()
+        print("Getting users for /r/{0}...".format(subreddit))
 
         while True:
             try:
@@ -138,6 +133,7 @@ class SubredditAnalysis(object):
             except (HTTPError, timeout) as e:
                 self.add_msg(e)
                 continue
+        
         # get the thread creator and if he's not
         # in the userList then add him there
         for i, submission in enumerate(submissions):
@@ -197,8 +193,8 @@ class SubredditAnalysis(object):
         subreddits.
         """
 
-        sys.stdout.write("Scanning for overlapping subreddits...\n")
-        sys.stdout.flush()
+        print("Scanning for overlapping subreddits...")
+        
 
         # keeps count on overlapping users
         self.counter = Counter()
@@ -276,8 +272,8 @@ class SubredditAnalysis(object):
         contains the subreddit and the overlapping users.
         """
 
-        sys.stdout.write("Creating tuples...\n")
-        sys.stdout.flush()
+        print("Creating tuples...")
+        
 
         # stores the tuples to be used for printing data
         self.subredditTuple = []
@@ -310,8 +306,8 @@ class SubredditAnalysis(object):
         overlapping users.
         """
 
-        sys.stdout.write("Adding data to database...\n")
-        sys.stdout.flush()
+        print("Adding data to database...")
+        
 
         dbFile = "{0}.db".format(subreddit)
 
@@ -350,8 +346,8 @@ class SubredditAnalysis(object):
         the second element.
         """
 
-        sys.stdout.write("Calculating similarity...\n")
-        sys.stdout.flush()
+        print("Calculating similarity...")
+        
 
         # format the file names
         dbFile1 = "{0}.db".format(subreddit1)
@@ -432,7 +428,7 @@ class SubredditAnalysis(object):
                 self.add_db(subreddit2, subredditTuple, len(userList))
 
             else:
-                raise skipThis.error()
+                raise skipThis.error(skipThis)
 
         # Query statements need strings fed in tuples
         sub1 = (subreddit1,)
@@ -496,8 +492,8 @@ class SubredditAnalysis(object):
         discovered by the bot. It returns the formatted string.
         """
 
-        sys.stdout.write("Formatting post...\n")
-        sys.stdout.flush()
+        print("Formatting post...")
+        
 
         # similarity values will be stored here for sorting
         self.simList = []
@@ -579,8 +575,8 @@ class SubredditAnalysis(object):
         the submission thread.
         """
 
-        sys.stdout.write("Submitting post...\n")
-        sys.stdout.flush()
+        print("Submitting post...")
+        
 
         # post to this subreddit
         self.mySubreddit = self.client.get_subreddit(self.post_to)
@@ -612,7 +608,7 @@ class SubredditAnalysis(object):
                 except ModeratorRequired, e:
                     self.add_msg(e)
                     logging.error("Failed to set flair. " + str(e) + '\n' + str(submission.permalink) + "\n\n")
-                    raise skipThis.error("Could not assign flair. Moderator privileges are necessary.")
+                    raise skipThis.error(skipThis, "Could not assign flair. Moderator privileges are necessary.")
     
 
     def log_info(self, info):
@@ -650,38 +646,38 @@ class SubredditAnalysis(object):
 class settings(Exception):
 
 
-    def missing(self, error=None, newline=True):
+    def missing(self, error=None, newline=False):
         """
         Exception raised when settings.cfg isn't detected. 
         error should be a string. Optional newline as well.
         """
 
         if error is not None:
-            sys.stdout.write(error)
+            print(error)
 
             if(newline):
-                sys.stdout.write('\n')
+                print('\n')
 
-            sys.stdout.flush()
+            
             sys.exit(1)
 
 
 class skipThis(Exception):
     
 
-    def error(self, error=None, newline=True):
+    def error(self, error=None, newline=False):
         """
         Print out an error message. error should be a string. 
         Optional newline as well.
         """
 
         if error is not None:
-            sys.stdout.write(error)
+            print(error)
             
             if(newline):
-                sys.stdout.write('\n')
+                print('\n')
 
-            sys.stdout.flush()
+            
 
 
 def login(username, password):
@@ -691,17 +687,16 @@ def login(username, password):
             break
 
         except (InvalidUser, InvalidUserPass, RateLimitExceeded, APIException) as e:
-                myBot.add_msg(e)
+                myBot.add_msg(str(e))
                 logging.error(str(e) + "\n\n")
                 sys.exit(1)
 
         except (HTTPError, timeout) as e:
-            myBot.add_msg(e)
+            myBot.add_msg(str(e))
             logging.error(str(e) + "\n\n")
             
             if i == 2:
-                sys.stdout.write("Failed to login.\n")
-                sys.stdout.flush()
+                print("Failed to login.")
                 sys.exit(1)
             
             else:
@@ -724,8 +719,8 @@ def check_subreddits(subredditList):
                 if(subreddit in ["quit", ".quit", 'q']):
                     continue
 
-                sys.stdout.write("Verifying /r/{0}...\n".format(subreddit))
-                sys.stdout.flush()
+                print("Verifying /r/{0}...".format(subreddit))
+                
 
                 try:
                     # make sure the subreddit is valid
@@ -734,13 +729,13 @@ def check_subreddits(subredditList):
                         "".join(submission.title)
 
                 except (InvalidSubreddit, RedirectException) as e:
-                    myBot.add_msg(e)
+                    myBot.add_msg(str(e))
                     logging.error("Invalid subreddit. Removing from list." + str(e) + "\n\n")
                     subredditList.remove(subreddit)
-                    raise skipThis.error(str(e))
+                    raise skipThis.error(skipThis, str(e))
 
                 except (HTTPError, timeout) as e:
-                    myBot.add_msg(e)
+                    myBot.add_msg(str(e))
                     logging.error(str(subreddit) + ' ' + str(e) + "\n\n")
 
                     # private subreddits return a 403 error
@@ -757,12 +752,12 @@ def check_subreddits(subredditList):
 
                     myBot.add_msg("Waiting a minute to try again...")   
                     sleep(60)
-                    raise skipThis.error(str(e))
+                    raise skipThis.error(skipThis, str(e))
 
                 except (APIException, ClientException, Exception) as e:
-                    myBot.add_msg(e)
+                    myBot.add_msg(str(e))
                     logging.error(str(e) + "\n\n")
-                    raise skipThis.error(str(e))
+                    raise skipThis.error(skipThis, str(e))
 
             break
 
@@ -776,8 +771,8 @@ def check_subreddits(subredditList):
     # keeps this message from being displayed when
     # the only item is a quit command
     if subredditList[0] not in ["quit", ".quit", 'q']:
-        sys.stdout.write("Subreddit verification completed.\n")
-        sys.stdout.flush()
+        print("Subreddit verification completed.")
+        
 
 
 def main():
@@ -812,8 +807,8 @@ def main():
             myBot.postLogging = False
 
         else:
-            sys.stdout.write("Invalid argument for logging. Use either \"on\" or \"off\".\n")
-            sys.stdout.flush()
+            print("Invalid argument for logging. Use either \"on\" or \"off\".")
+            
             sys.exit(1)
 
     if options.banOption is not None:
@@ -830,8 +825,8 @@ def main():
             myBot.banList = []
 
         else:
-            sys.stdout.write("Invalid argument for logging. Use either \"on\" or \"off\".\n")
-            sys.stdout.flush()
+            print("Invalid argument for logging. Use either \"on\" or \"off\".")
+            
             sys.exit(1)
 
     if options.infoLogging is not None:
@@ -842,8 +837,8 @@ def main():
             myBot.infoLogging = False
 
         else:
-            sys.stdout.write("Invalid agument for logging. Use either \"on\" or \"off\".\n")
-            sys.stdout.flush()
+            print("Invalid agument for logging. Use either \"on\" or \"off\".")
+            
             sys.exit(1)
 
     if options.postLogging is not None:
@@ -854,7 +849,7 @@ def main():
             myBot.postLogging = False
 
         else:
-            sys.stdout.write("Invalid argument for logging. Use either \"on\" or \"off\".\n")
+            print("Invalid argument for logging. Use either \"on\" or \"off\".")
             sys.exit(1)
 
     if options.ScrapeLimit is not None:
@@ -868,8 +863,8 @@ def main():
             myBot.verbose = False
 
         else:
-            sys.stdout.write("Invalid argument for verbosity. Use either \"on\" or \"off\".\n")
-            sys.stdout.flush()
+            print("Invalid argument for verbosity. Use either \"on\" or \"off\".")
+            
             sys.exit(1)
 
     if options.userCreds is not None:
@@ -877,11 +872,11 @@ def main():
         username = credentials[0]
         password = credentials[1]
 
-    sys.stdout.write("Welcome to Reddit Analysis Bot.\n")
-    sys.stdout.flush()
+    print("Welcome to Reddit Analysis Bot.")
+    
 
-    sys.stdout.write("Type \"quit\", \".quit\", or \'q\' to sys.exit the program.\n")
-    sys.stdout.flush()
+    print("Type \"quit\", \".quit\", or \'q\' to exit the program.")
+    
 
     login(username, password)
 
@@ -901,8 +896,8 @@ def main():
         check_subreddits(checkList)
 
         if checkList == []:
-            sys.stdout.write("Subreddit failed check. Can't post there.\n")
-            sys.stdout.flush()
+            print("Subreddit failed check. Can't post there.")
+            
             sys.exit(1)
 
         else:
@@ -931,8 +926,8 @@ def main():
             dbFile = "{0}.db".format(subreddit)
 
             if(subreddit in ["quit", ".quit", 'q']):
-                sys.stdout.write("Quitting...\n")
-                sys.stdout.flush()
+                print("Quitting...")
+                
                 sys.exit(0)
 
             elif(os.path.isfile(dbFile)):
@@ -951,7 +946,7 @@ def main():
                     text = myBot.format_post(subreddit, userList)
                 
                 except Exception, e:
-                    myBot.add_msg(e)
+                    myBot.add_msg(str(e))
                     logging.error("Failed to format post. " + str(e) + "\n\n")
                     continue
 
@@ -963,16 +958,16 @@ def main():
                             break
 
                         except (HTTPError, timeout) as e:
-                            myBot.add_msg(e)
+                            myBot.add_msg(str(e))
                             logging.error(str(e) + "\n\n")
                             myBot.add_msg("Waiting to try again...")
                             sleep(60)
                             continue
 
                         except (APIException, ClientException, Exception) as e:
-                            myBot.add_msg(e)
+                            myBot.add_msg(str(e))
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(str(e))
+                            raise skipThis.error(skipThis, str(e))
 
                 except skipThis:
                     logging.error(str(e) + "\n\n")
@@ -986,9 +981,9 @@ def main():
                             myBot.give_flair(post, subreddit)
 
                         except (APIException, ClientException, Exception) as e:
-                            myBot.add_msg(e)
+                            myBot.add_msg(str(e))
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(str(e))
+                            raise skipThis.error(skipThis, str(e))
 
                     except skipThis:
                         continue
@@ -1006,15 +1001,15 @@ def main():
                             break
 
                         except (InvalidSubreddit, RedirectException) as e:
-                            myBot.add_msg(e)
+                            myBot.add_msg(str(e))
                             logging.error("Invalid subreddit. Removing from list." + str(e) + "\n\n")
                             drilldownList.remove(subreddit)
-                            raise skipThis.error(str(e))
+                            raise skipThis.error(skipThis, str(e))
 
                         except (APIException, ClientException, Exception) as e:
-                            myBot.add_msg(e)
+                            myBot.add_msg(str(e))
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(str(e))
+                            raise skipThis.error(skipThis, str(e))
 
                 except skipThis:
                     continue
@@ -1034,9 +1029,9 @@ def main():
                             break
 
                         except (APIException, ClientException, Exception) as e:
-                            myBot.add_msg(e)
+                            myBot.add_msg(str(e))
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(str(e))
+                            raise skipThis.error(skipThis, str(e))
 
                 except skipThis:
                     continue
@@ -1058,7 +1053,7 @@ def main():
                     myBot.log_info("\n\n")
 
                 except Exception, e:
-                    myBot.add_msg(e)
+                    myBot.add_msg(str(e))
                     logging.error("Failed to create tuples. " + str(e) + "\n\n")
                     continue
 
@@ -1066,7 +1061,7 @@ def main():
                     myBot.add_db(subreddit, subredditTuple, len(userList))
 
                 except Exception, e:
-                    myBot.add_msg(e)
+                    myBot.add_msg(str(e))
                     logging.error("Failed to add to database. " + str(e) + "\n\n")
                     continue
 
@@ -1075,7 +1070,7 @@ def main():
                     text = myBot.format_post(subreddit, userList)
                 
                 except Exception, e:
-                    myBot.add_msg(e)
+                    myBot.add_msg(str(e))
                     logging.error("Failed to format post. " + str(e) + "\n\n")
                     continue
 
@@ -1088,16 +1083,16 @@ def main():
                             break
 
                         except (HTTPError, timeout) as e:
-                            myBot.add_msg(e)
+                            myBot.add_msg(str(e))
                             logging.error(str(e) + "\n\n")
                             myBot.add_msg("Waiting to try again...")
                             sleep(60)
                             continue
 
                         except (APIException, ClientException, Exception) as e:
-                            myBot.add_msg(e)
+                            myBot.add_msg(str(e))
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(str(e))
+                            raise skipThis.error(skipThis, str(e))
 
                 except skipThis:
                     logging.error(str(e) + "\n\n")
@@ -1107,19 +1102,19 @@ def main():
                 if(post != None):
                     try:
                         try:
-                            sys.stdout.write("Setting post's flair...\n")
-                            sys.stdout.flush()
+                            print("Setting post's flair...\n")
+                            
                             myBot.give_flair(post, subreddit)
 
                         except ModeratorRequired, e:
-                            myBot.add_msg(e)
+                            myBot.add_msg(str(e))
                             logging.error("Failed to set flair. " + str(e) + '\n' + str(post.permalink) + "\n\n")
-                            raise skipThis.error(str(e))
+                            raise skipThis.error(skipThis, str(e))
 
                         except (APIException, ClientException, Exception) as e:
-                            myBot.add_msg(e)
+                            myBot.add_msg(str(e))
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(str(e))
+                            raise skipThis.error(skipThis, str(e))
 
                     except skipThis:
                         continue
