@@ -29,7 +29,7 @@ class SubredditAnalysis(object):
 
         # check for settings.cfg file
         if(os.path.isfile("settings.cfg") == False):
-            raise settings.missing("Could not find settings.cfg.")
+            raise settings("Could not find settings.cfg.")
 
         # needed to read the settings.cfg file
         self.config = simpleconfigparser()
@@ -97,7 +97,6 @@ class SubredditAnalysis(object):
                 print('\n')
 
 
-
     def login(self, username, password):
         """
         This function logs the bot into its Reddit account.
@@ -110,7 +109,6 @@ class SubredditAnalysis(object):
 
         self.client.login(username, password)
         print("Login successful.")
-        
 
 
     def get_users(self, subreddit):
@@ -428,7 +426,7 @@ class SubredditAnalysis(object):
                 self.add_db(subreddit2, subredditTuple, len(userList))
 
             else:
-                raise skipThis.error(skipThis)
+                raise skipThis("Subreddit in banlist. Skipping...")
 
         # Query statements need strings fed in tuples
         sub1 = (subreddit1,)
@@ -608,7 +606,7 @@ class SubredditAnalysis(object):
                 except ModeratorRequired as e:
                     self.add_msg(e)
                     logging.error("Failed to set flair. " + str(e) + '\n' + str(submission.permalink) + "\n\n")
-                    raise skipThis.error("Could not assign flair. Moderator privileges are necessary.")
+                    raise skipThis("Could not assign flair. Moderator privileges are necessary.")
     
 
     def log_info(self, info):
@@ -644,38 +642,17 @@ class SubredditAnalysis(object):
 
 
 class settings(Exception):
+    
 
-
-    def missing(error=None, newline=False):
-        """
-        Exception raised when settings.cfg isn't detected. 
-        error should be a string. Optional newline as well.
-        """
-
-        if error is not None:
-            print(error)
-
-            if(newline):
-                print('\n')
-
-            
-            sys.exit(1)
+    def __init__(self, error):
+        print(error)
 
 
 class skipThis(Exception):
     
 
-    def error(error=None, newline=False):
-        """
-        Print out an error message. error should be a string. 
-        Optional newline as well.
-        """
-
-        if error is not None:
-            print(error)
-            
-            if(newline):
-                print('\n')
+    def __init__(self, error):
+        print(error)
 
 
 def login(username, password):
@@ -730,7 +707,7 @@ def check_subreddits(subredditList):
                     myBot.add_msg(e)
                     logging.error("Invalid subreddit. Removing from list." + str(e) + "\n\n")
                     subredditList.remove(subreddit)
-                    raise skipThis.error(str(e))
+                    raise skipThis("Skipping invalid subreddit...")
 
                 except (HTTPError, timeout) as e:
                     myBot.add_msg(e)
@@ -750,12 +727,12 @@ def check_subreddits(subredditList):
 
                     myBot.add_msg("Waiting a minute to try again...")   
                     sleep(60)
-                    raise skipThis.error(str(e))
+                    raise skipThis("Trying again...")
 
                 except (APIException, ClientException, Exception) as e:
                     myBot.add_msg(e)
                     logging.error(str(e) + "\n\n")
-                    raise skipThis.error(str(e))
+                    raise skipThis("Something went wrong. Skipping...")
 
             break
 
@@ -766,12 +743,15 @@ def check_subreddits(subredditList):
             else:
                 continue
 
-    # keeps this message from being displayed when
-    # the only item is a quit command
-    if subredditList[0] not in ["quit", ".quit", 'q']:
-        print("Subreddit verification completed.")
-        
+    try:
+        # keeps this message from being displayed when
+        # the only item is a quit command
+        if subredditList[0] not in ["quit", ".quit", 'q']:
+            print("Subreddit verification completed.")
 
+    except IndexError:
+        print("Subreddit List empty.")
+        
 
 def main():
     
@@ -965,7 +945,7 @@ def main():
                         except (APIException, ClientException, Exception) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(str(e))
+                            raise skipThis("Something went wrong. Skipping...")
 
                 except skipThis:
                     logging.error(str(e) + "\n\n")
@@ -981,7 +961,7 @@ def main():
                         except (APIException, ClientException, Exception) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(str(e))
+                            raise skipThis("Couldn't flair post. Skipping...")
 
                     except skipThis:
                         continue
@@ -1002,12 +982,12 @@ def main():
                             myBot.add_msg(e)
                             logging.error("Invalid subreddit. Removing from list." + str(e) + "\n\n")
                             drilldownList.remove(subreddit)
-                            raise skipThis.error(str(e))
+                            raise skipThis("Skipping invalid subreddit...")
 
                         except (APIException, ClientException, Exception) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(str(e))
+                            raise skipThis("Couldn't get users. Skipping...")
 
                 except skipThis:
                     continue
@@ -1029,7 +1009,7 @@ def main():
                         except (APIException, ClientException, Exception) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(str(e))
+                            raise skipThis("Couldn't get overlapping subreddits. Skipping...")
 
                 except skipThis:
                     continue
@@ -1090,7 +1070,7 @@ def main():
                         except (APIException, ClientException, Exception) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(str(e))
+                            raise skipThis("Couldn't submit post. Skipping...")
 
                 except skipThis:
                     logging.error(str(e) + "\n\n")
@@ -1107,12 +1087,12 @@ def main():
                         except ModeratorRequired as e:
                             myBot.add_msg(e)
                             logging.error("Failed to set flair. " + str(e) + '\n' + str(post.permalink) + "\n\n")
-                            raise skipThis.error(str(e))
+                            raise skipThis("Need moderator privileges to set flair. Skipping...")
 
                         except (APIException, ClientException, Exception) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis.error(str(e))
+                            raise skipThis("Couldn't set flair. Skipping...")
 
                     except skipThis:
                         continue
