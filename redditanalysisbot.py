@@ -764,8 +764,13 @@ def main():
     login(username, password)
 
     while True:
-        # list of subreddits you want to analyze
-        drilldownList = raw_input("Enter the subreddits you wish to target.~/> ").split()
+        try:
+            # list of subreddits you want to analyze
+            drilldownList = raw_input("Enter the subreddits you wish to target.~/> ").split()
+
+        except NameError:
+            # python 3 support
+            drilldownList = input("Enter the subreddits you wish to target.~/> ").split()
 
         # check to make sure each subreddit is valid
         check_subreddits(drilldownList)
@@ -981,7 +986,7 @@ if __name__ == "__main__":
             filemode='a', format="%(asctime)s\nIn "
             "%(filename)s (%(funcName)s:%(lineno)s): "
             "%(message)s", datefmt="%Y-%m-%d %H:%M:%S", 
-            level=logging.ERROR, stream=sys.stderr
+            level=logging.ERROR
         )
 
     main()
