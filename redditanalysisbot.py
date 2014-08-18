@@ -3,7 +3,6 @@ from datetime import datetime
 import logging
 from math import sqrt
 import operator
-import optparse
 import os
 import sqlite3 as db
 from socket import timeout
@@ -29,7 +28,7 @@ class SubredditAnalysis(object):
 
         # check for settings.cfg file
         if(os.path.isfile("settings.cfg") == False):
-            raise settings("Could not find settings.cfg.")
+            raise SettingsError("Could not find settings.cfg.")
 
         # needed to read the settings.cfg file
         self.config = simpleconfigparser()
@@ -475,7 +474,7 @@ class SubredditAnalysis(object):
         con2.close()
 
         # use the retrieved data to calculate similarity
-        similarity = "%.05f" % ((sqrt(AB * BA)) / (sqrt(float(A * B))))
+        similarity = "{0:.05f}".format((sqrt(AB * BA)) / (sqrt(float(A * B))))
         
         return (subreddit2, similarity)
 
@@ -641,7 +640,7 @@ class SubredditAnalysis(object):
             self.postFile.close()
 
 
-class settings(Exception):
+class SettingsError(Exception):
     
 
     def __init__(self, error):
@@ -756,138 +755,13 @@ def check_subreddits(subredditList):
 def main():
     
     # login credentials
-    # these can be overwritten with commandline arguments
     username = myBot.config.login.username
     password = myBot.config.login.password
 
-    
-    # commandline options for additional feature support
-    parser = optparse.OptionParser("python redditanalysisbot.py [options]")
-    parser.add_option("--aB", "--addBan", dest="tgtBan", type="string", help="Add a subreddit to the ban list. Separate subreddits with commas.")
-    parser.add_option("--aL", "--enableLogging", dest="enableLogging", type="string", help="Turn all logging on or off. On by default.")
-    parser.add_option("-b", "--banList", dest="banOption", type="string", help="Turn the ban list on and off. On by default.")
-    parser.add_option("--iL", "--infoLogging", dest="infoLogging", type="string", help="Turn raw data logging on and off. On by default.")
-    parser.add_option("-p", "--postHere", dest="SubredditName", type="string", help="Post to this subreddit. Defaults to /r/SubredditAnalysis")
-    parser.add_option("--pL", "--postLogging", dest="postLogging", type="string", help="Turn post logging on and off. On by default.")
-    parser.add_option("-s", "--scrapeLimit", dest="ScrapeLimit", type="int", help="Set the number of submissions to be scanned. 1000 by default.")
-    parser.add_option("-v", "--verbose", dest="verbosity", type="string", help="Make the program more verbose with status updates and print out errors. Defaults to off.")
-    parser.add_option("-u", "--userCreds", dest="userCreds", type="string", help="Give the bot the username and password for a Reddit account. Separate them with a comma.")
-    parser.add_option("--uB", "--unBan", dest="tgtUnban", type="string", help="Remove a subreddit from the ban list. Separate subreddits with commas.")
-    (options, args) = parser.parse_args()
-
-    if options.enableLogging is not None:
-        if options.enableLogging.lower() == "on":
-            myBot.infoLogging = True
-            myBot.postLogging = True
-
-        elif options.enableLogging.lower() == "off":
-            myBot.infoLogging = False
-            myBot.postLogging = False
-
-        else:
-            print("Invalid argument for logging. Use either \"on\" or \"off\".")
-            
-            sys.exit(1)
-
-    if options.banOption is not None:
-        if options.banOption.lower() == "on":
-            bans = open("banlist.txt", 'r')
-
-            for subreddit in bans.readlines():
-                subreddit = subreddit.strip('\n')
-                myBot.banList.append(subreddit)
-
-            bans.close()
-
-        elif options.banOption.lower() == "off":
-            myBot.banList = []
-
-        else:
-            print("Invalid argument for logging. Use either \"on\" or \"off\".")
-            
-            sys.exit(1)
-
-    if options.infoLogging is not None:
-        if options.infoLogging.lower() == "on":
-            myBot.infoLogging = True
-
-        elif options.infoLogging.lower() == "off":
-            myBot.infoLogging = False
-
-        else:
-            print("Invalid agument for logging. Use either \"on\" or \"off\".")
-            
-            sys.exit(1)
-
-    if options.postLogging is not None:
-        if options.postLogging.lower() == "on":
-            myBot.postLogging = True
-
-        elif options.postLogging.lower() == "off":
-            myBot.postLogging = False
-
-        else:
-            print("Invalid argument for logging. Use either \"on\" or \"off\".")
-            sys.exit(1)
-
-    if options.ScrapeLimit is not None:
-        myBot.scrapeLimit = options.ScrapeLimit
-
-    if options.verbosity is not None:
-        if options.verbosity.lower() == "on":
-            myBot.verbose = True
-
-        elif options.verbosity.lower() == "off":
-            myBot.verbose = False
-
-        else:
-            print("Invalid argument for verbosity. Use either \"on\" or \"off\".")
-            
-            sys.exit(1)
-
-    if options.userCreds is not None:
-        credentials = options.userCreds.split(',')
-        username = credentials[0]
-        password = credentials[1]
-
     print("Welcome to Reddit Analysis Bot.")
-    
-
     print("Type \"quit\", \".quit\", or \'q\' to exit the program.")
     
-
     login(username, password)
-
-    # these 3 require the client attribute, which is created
-    # in the login function
-    if options.tgtBan is not None:
-        checkList = options.tgtBan.split(',')
-
-        check_subreddits(checkList)
-
-        for element in checkList:
-            myBot.banList.append(element)
-
-    if options.SubredditName is not None:
-        checkList = [options.SubredditName]
-
-        check_subreddits(checkList)
-
-        if checkList == []:
-            print("Subreddit failed check. Can't post there.")
-            
-            sys.exit(1)
-
-        else:
-            myBot.post_to = options.SubredditName
-
-    if options.tgtUnban is not None:
-        checkList = options.tgtUnban.split(',')
-
-        check_subreddits(checkList)
-
-        for element in checkList:
-            myBot.banList.remove(element)
 
     while True:
         # list of subreddits you want to analyze
