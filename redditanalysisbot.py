@@ -81,6 +81,7 @@ class SubredditAnalysis(object):
                     subreddit = subreddit.strip('\n')
                     self.banList.append(subreddit)
 
+
     def add_msg(self, msg=None, newline=False):
         """
         Simple function to make terminal output optional. Feed
