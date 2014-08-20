@@ -578,8 +578,12 @@ class SubredditAnalysis(object):
         # post to this subreddit
         self.mySubreddit = self.client.get_subreddit(self.post_to)
 
-        # thread title
-        title = "/r/{0} Drilldown {1}".format(subreddit, datetime.now().strftime("%B %Y"))
+        if(len(self.banList) > 0):
+            # thread title
+            title = "/r/{0} Drilldown {1}".format(subreddit, datetime.now().strftime("%B %Y"))
+
+        else:
+            title = "/r/{0} Drilldown {1} (Subreddit Bans Disabled)".format(subreddit, datetime.now().strftime("%B %Y"))
 
         # finally submit it
         return self.mySubreddit.submit(title, text)
