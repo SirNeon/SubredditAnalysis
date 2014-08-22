@@ -279,6 +279,9 @@ class SubredditAnalysis(object):
                         self.add_msg(e)
                         continue
 
+                con.commit()
+                con.close()
+
             else:
                 
                 # keeps track of user subs to prevent multiple
@@ -297,6 +300,7 @@ class SubredditAnalysis(object):
                     cur.execute("SELECT * FROM user")
 
                 except db.OperationalError as e:
+                    con.close()
                     os.remove("users/{0}".format(dbFile))
                     continue
 
@@ -311,6 +315,8 @@ class SubredditAnalysis(object):
 
                         if csubreddit not in self.subredditList:
                             self.subredditList.append(csubreddit)
+
+                con.close()
 
         return self.subredditList
 
