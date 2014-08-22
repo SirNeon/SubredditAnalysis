@@ -81,7 +81,7 @@ class SubredditAnalysis(object):
                     subreddit = subreddit.strip('\n')
                     self.banList.append(subreddit)
 
-
+    
     def add_msg(self, msg=None, newline=False):
         """
         Simple function to make terminal output optional. Feed
@@ -197,66 +197,115 @@ class SubredditAnalysis(object):
         # keeps count on overlapping users
         self.counter = Counter()
 
+        if not(os.path.isdir("users")):
+            os.mkdir("users")
+
         # iterate through the list of users in order
         # to get their comments/submissions for crossreferencing
         for i, user in enumerate(userList):
             shadowbanned = False
 
-            while True:
-                try:
-                    overview = self.client.get_redditor(user).get_overview(limit=self.overviewLimit)
-                    break
-                # handle shadowbanned/deleted accounts
-                except (HTTPError, timeout) as e:
-                    self.add_msg(e)
+            dbFile = "{0}.db".format(user)
+            
+            if not(os.path.isfile("users/{0}".format(dbFile))):
+                con = db.connect("users/{0}".format(dbFile))
+                cur = con.cursor()
 
-                    if "404" in str(e):
-                        shadowbanned = True
+                while True:
+                    try:
+                        overview = self.client.get_redditor(user).get_overview(limit=self.overviewLimit)
                         break
+                    # handle shadowbanned/deleted accounts
+                    except (HTTPError, timeout) as e:
+                        self.add_msg(e)
 
-                    else:
-                        continue
+                        if "404" in str(e):
+                            shadowbanned = True
+                            break
 
-            if(shadowbanned):
-                continue
-
-            # keeps track of user subs to prevent multiple
-            # posts from being tallied
-            self.userDone = []
-
-            # keeps track of how many users are remaining
-            usersLeft = len(userList) - i - 1
-
-            self.add_msg("({0} / {1}) users remaining.".format(usersLeft, len(userList)))
-
-            while True:
-                try:
-                    for submission in overview:
-
-                        try:
-                            csubreddit = str(submission.subreddit)
-                            comScore = int(submission.score)
-
-                        except AttributeError:
+                        else:
                             continue
 
-                        if comScore > self.minScore:
-                            if csubreddit not in self.userDone:
-                                # keep tabs on how many
-                                # users post to a subreddit
-                                self.counter[csubreddit] += 1
-                                self.userDone.append(csubreddit)
-
-                            # add the ones that aren't kept in the list
-                            # to the list of subreddits
-                            if csubreddit not in self.subredditList:
-                                self.subredditList.append(csubreddit)
-
-                    break
-
-                except (HTTPError, timeout) as e:
-                    self.add_msg(e)
+                if(shadowbanned):
                     continue
+
+                cur.execute("CREATE TABLE IF NOT EXISTS user(Overlap TEXT, Type TEXT, ID TEXT, Score INT)")
+
+                # keeps track of user subs to prevent multiple
+                # posts from being tallied
+                self.userDone = []
+
+                # keeps track of how many users are remaining
+                usersLeft = len(userList) - i - 1
+
+                self.add_msg("({0} / {1}) users remaining.".format(usersLeft, len(userList)))
+
+                while True:
+                    try:
+                        for submission in overview:
+
+                            try:
+                                csubreddit = str(submission.subreddit)
+                                comScore = int(submission.score)
+                                comID = str(submission.id)
+
+                            except AttributeError:
+                                continue
+
+                            try:
+                                testIfSubmission = str(submission.stickied)
+                                submissionType = "submission"
+
+                            except AttributeError:
+                                submissionType = "comment"
+
+                            cur.execute("INSERT INTO user VALUES(?, ?, ?, ?)", (csubreddit, submissionType, comID, comScore))
+
+                            if comScore > self.minScore:
+                                if csubreddit not in self.userDone:
+                                    # keep tabs on how many
+                                    # users post to a subreddit
+                                    self.counter[csubreddit] += 1
+                                    self.userDone.append(csubreddit)
+
+                                # add the ones that aren't kept in the list
+                                # to the list of subreddits
+                                if csubreddit not in self.subredditList:
+                                    self.subredditList.append(csubreddit)
+
+                        break
+
+                    except (HTTPError, timeout) as e:
+                        self.add_msg(e)
+                        continue
+
+            else:
+                
+                # keeps track of user subs to prevent multiple
+                # posts from being tallied
+                self.userDone = []
+
+                # keeps track of how many users are remaining
+                usersLeft = len(userList) - i - 1
+
+                self.add_msg("({0} / {1}) users remaining.".format(usersLeft, len(userList)))
+
+                con = db.connect("users/{0}".format(dbFile))
+                cur = con.cursor()
+
+                cur.execute("SELECT * FROM user")
+
+                for row in cur:
+                    csubreddit = operator.getitem(row, 0)
+                    comScore = int(operator.getitem(row, 3))
+
+                    if comScore > self.minScore:
+                        if csubreddit not in self.userDone:
+                            self.counter[csubreddit] += 1
+                            self.userDone.append(csubreddit)
+
+                        if csubreddit not in self.subredditList:
+                            self.subredditList.append(csubreddit)
 
         return self.subredditList
 
@@ -306,16 +355,18 @@ class SubredditAnalysis(object):
 
         print("Adding data to database...")
         
+        if not(os.path.isdir("subreddits")):
+            os.mkdir("subreddits")
 
         dbFile = "{0}.db".format(subreddit)
 
-        if(os.path.isfile(dbFile)):
+        if(os.path.isfile("subreddits/{0}".format(dbFile))):
             pass
 
         else:
 
             # connect to the database file
-            con = db.connect(dbFile)
+            con = db.connect("subreddits/{0}".format(dbFile))
         
             # create the cursor object for the database
             cur = con.cursor()
@@ -359,7 +410,7 @@ class SubredditAnalysis(object):
         BA = None
 
         # if a drilldown for this subreddit hasn't been done then do it
-        if(os.path.isfile(dbFile1) == False):
+        if(os.path.isfile("subreddits/{0}".format(dbFile1)) == False):
             while True:
                 try:
                     userList = self.get_users(subreddit1)
@@ -392,7 +443,7 @@ class SubredditAnalysis(object):
 
             self.add_db(subreddit1, subredditTuple, len(userList))
 
-        if(os.path.isfile(dbFile2) == False):
+        if(os.path.isfile("subreddits/{0}".format(dbFile2)) == False):
             if subreddit2 not in self.banList:
                 while True:
                     try:
@@ -433,7 +484,7 @@ class SubredditAnalysis(object):
         sub2 = (subreddit2,)
 
         # open the database for subreddit 1
-        con1 = db.connect(dbFile1)
+        con1 = db.connect("subreddits/{0}".format(dbFile1))
         cur1 = con1.cursor()
 
         # get the number of overlapping users from subreddit2
@@ -452,7 +503,7 @@ class SubredditAnalysis(object):
         con1.close()
 
         # open the database for subreddit2
-        con2 = db.connect(dbFile2)
+        con2 = db.connect("subreddits/{0}".format(dbFile2))
         cur2 = con2.cursor()
 
         # do the same thing for subreddit1 and was done for subreddit2
@@ -498,7 +549,7 @@ class SubredditAnalysis(object):
 
         dbFile = "{0}.db".format(subreddit)
 
-        con = db.connect(dbFile)
+        con = db.connect("subreddits/{0}".format(dbFile))
         cur = con.cursor()
 
         self.bodyContent = ""
@@ -792,8 +843,8 @@ def main():
                 
                 sys.exit(0)
 
-            elif(os.path.isfile(dbFile)):
-                con = db.connect(dbFile)
+            elif(os.path.isfile("subreddits/{0}".format(dbFile))):
+                con = db.connect("subreddits/{0}".format(dbFile))
                 cur = con.cursor()
 
                 sub = (subreddit,)
