@@ -208,9 +208,6 @@ class SubredditAnalysis(object):
             dbFile = "{0}.db".format(user)
             
             if not(os.path.isfile("users/{0}".format(dbFile))):
-                con = db.connect("users/{0}".format(dbFile))
-                cur = con.cursor()
-
                 while True:
                     try:
                         overview = self.client.get_redditor(user).get_overview(limit=self.overviewLimit)
@@ -228,6 +225,9 @@ class SubredditAnalysis(object):
 
                 if(shadowbanned):
                     continue
+
+                con = db.connect("users/{0}".format(dbFile))
+                cur = con.cursor()
 
                 cur.execute("CREATE TABLE IF NOT EXISTS user(Overlap TEXT, Type TEXT, ID TEXT, Score INT)")
 
@@ -293,7 +293,12 @@ class SubredditAnalysis(object):
                 con = db.connect("users/{0}".format(dbFile))
                 cur = con.cursor()
 
-                cur.execute("SELECT * FROM user")
+                try:
+                    cur.execute("SELECT * FROM user")
+
+                except db.OperationalError as e:
+                    os.remove("users/{0}".format(dbFile))
+                    continue
 
                 for row in cur:
                     csubreddit = operator.getitem(row, 0)
@@ -941,7 +946,7 @@ def main():
                             myBot.subredditList = []
                             break
 
-                        except (APIException, ClientException, Exception) as e:
+                        except (APIException, ClientException) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
                             raise skipThis("Couldn't get overlapping subreddits. Skipping...")
