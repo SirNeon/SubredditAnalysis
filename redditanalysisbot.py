@@ -128,7 +128,7 @@ class SubredditAnalysis(object):
                 submissions = self.client.get_subreddit(subreddit).get_hot(limit=self.scrapeLimit)
                 break
 
-            except (HTTPError, timeout) as e:
+            except (ConnectionResetError, HTTPError, timeout) as e:
                 self.add_msg(e)
                 continue
         
@@ -159,7 +159,7 @@ class SubredditAnalysis(object):
                     submission.replace_more_comments(limit=None, threshold=0)
                     break
 
-                except (HTTPError, timeout) as e:
+                except (ConnectionResetError, HTTPError, timeout) as e:
                     self.add_msg(e)
                     continue
 
@@ -213,7 +213,7 @@ class SubredditAnalysis(object):
                         overview = self.client.get_redditor(user).get_overview(limit=self.overviewLimit)
                         break
                     # handle shadowbanned/deleted accounts
-                    except (HTTPError, timeout) as e:
+                    except (ConnectionResetError, HTTPError, timeout) as e:
                         self.add_msg(e)
 
                         if "404" in str(e):
@@ -275,7 +275,7 @@ class SubredditAnalysis(object):
 
                         break
 
-                    except (HTTPError, timeout) as e:
+                    except (ConnectionResetError, HTTPError, timeout) as e:
                         self.add_msg(e)
                         continue
 
@@ -665,7 +665,7 @@ class SubredditAnalysis(object):
                     self.client.set_flair(self.post_to, submission, flair_text=flairText)
                     break
 
-                except (HTTPError, timeout) as e:
+                except (ConnectionResetError, HTTPError, timeout) as e:
                     self.add_msg(e)
                     continue
 
@@ -732,7 +732,7 @@ def login(username, password):
                 logging.error(str(e) + "\n\n")
                 sys.exit(1)
 
-        except (HTTPError, timeout) as e:
+        except (ConnectionResetError, HTTPError, timeout) as e:
             myBot.add_msg(e)
             logging.error(str(e) + "\n\n")
             
@@ -775,7 +775,7 @@ def check_subreddits(subredditList):
                     subredditList.remove(subreddit)
                     raise skipThis("Skipping invalid subreddit...")
 
-                except (HTTPError, timeout) as e:
+                except (ConnectionResetError, HTTPError, timeout) as e:
                     myBot.add_msg(e)
                     logging.error(str(subreddit) + ' ' + str(e) + "\n\n")
 
@@ -881,7 +881,7 @@ def main():
                             post = myBot.submit_post(subreddit, text)
                             break
 
-                        except (HTTPError, timeout) as e:
+                        except (ConnectionResetError, HTTPError, timeout) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
                             myBot.add_msg("Waiting to try again...")
@@ -1006,7 +1006,7 @@ def main():
                             post = myBot.submit_post(subreddit, text)
                             break
 
-                        except (HTTPError, timeout) as e:
+                        except (ConnectionResetError, HTTPError, timeout) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
                             myBot.add_msg("Waiting to try again...")
