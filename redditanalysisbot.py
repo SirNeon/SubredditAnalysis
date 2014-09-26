@@ -5,6 +5,7 @@ from math import sqrt
 import operator
 import os
 import sqlite3 as db
+from sqlite3 import OperationalError
 from socket import timeout
 import sys
 from time import sleep
@@ -54,6 +55,12 @@ class SubredditAnalysis(object):
 
         # calculate similarity or not
         self.similarity = self.config.main.getboolean("similarity")
+
+        # determines how many subreddits the bot calculates similarity for
+        self.similarityLimit = int(self.config.main.similarityLimit)
+
+        # sets the cap for sample size
+        self.userLimit = int(self.config.main.userLimit)
 
         # post drilldown to this subreddit
         self.post_to = self.config.main.post_to
@@ -135,7 +142,7 @@ class SubredditAnalysis(object):
         # get the thread creator and if he's not
         # in the userList then add him there
         for i, submission in enumerate(submissions):
-            if len(self.userList) > 10000:
+            if len(self.userList) > self.userLimit:
                 return self.userList
 
             try:
@@ -259,7 +266,11 @@ class SubredditAnalysis(object):
                             except AttributeError:
                                 submissionType = "comment"
 
-                            cur.execute("INSERT INTO user VALUES(?, ?, ?, ?)", (csubreddit, submissionType, comID, comScore))
+                            try:
+                                cur.execute("INSERT INTO user VALUES(?, ?, ?, ?)", (csubreddit, submissionType, comID, comScore))
+
+                            except OperationalError as e:
+                                pass
 
                             if comScore > self.minScore:
                                 if csubreddit not in self.userDone:
@@ -299,7 +310,7 @@ class SubredditAnalysis(object):
                 try:
                     cur.execute("SELECT * FROM user")
 
-                except db.OperationalError as e:
+                except OperationalError as e:
                     con.close()
                     os.remove("users/{0}".format(dbFile))
                     continue
@@ -423,72 +434,101 @@ class SubredditAnalysis(object):
         # if a drilldown for this subreddit hasn't been done then do it
         if(os.path.isfile("subreddits/{0}".format(dbFile1)) == False):
             while True:
+                # get the list of users
                 try:
                     userList = self.get_users(subreddit1)
                     self.userList = []
                     break
 
+                except (InvalidSubreddit, RedirectException) as e:
+                    self.add_msg(e)
+                    logging.error(str(e) + "\n\n")
+                    raise SkipThis("Skipping invalid subreddit...")
+
                 except (APIException, ClientException, Exception) as e:
                     self.add_msg(e)
-                    continue
-            
+                    logging.error(str(e) + "\n\n")
+                    raise SkipThis("Couldn't get users. Skipping...")
+        
             while True:
                 try:
+                    # get the list of subreddits
                     subredditList = self.get_subs(userList)
                     self.subredditList = []
                     break
 
-                except (APIException, ClientException, Exception) as e:
-                    self.add_msg(e)
-                    continue
+                except (APIException, ClientException, OperationalError) as e:
+                        self.add_msg(e)
+                        logging.error(str(e) + "\n\n")
+                        raise SkipThis("Couldn't get overlapping subreddits. Skipping...")
 
-            while True:
                 try:
+                    # get the list of tuples
                     subredditTuple = self.create_tuples(subreddit1, subredditList)
-                    self.subredditTuple = []
-                    break
 
-                except (APIException, ClientException, Exception) as e:
+                except Exception as e:
                     self.add_msg(e)
-                    continue
+                    logging.error("Failed to create tuples. " + str(e) + "\n\n")
+                    raise SkipThis("Failed to create tuples. Skipping...")
 
-            self.add_db(subreddit1, subredditTuple, len(userList))
+                try:
+                    self.add_db(subreddit1, subredditTuple, len(userList))
+
+                except Exception as e:
+                    self.add_msg(e)
+                    logging.error("Failed to add to database. " + str(e) + "\n\n")
+                    raise SkipThis("Failed to add data to database. Skipping...")
 
         if(os.path.isfile("subreddits/{0}".format(dbFile2)) == False):
             if subreddit2 not in self.banList:
                 while True:
+                    # get the list of users
                     try:
                         userList = self.get_users(subreddit2)
                         self.userList = []
                         break
 
+                    except (InvalidSubreddit, RedirectException) as e:
+                        self.add_msg(e)
+                        logging.error(str(e) + "\n\n")
+                        raise SkipThis("Skipping invalid subreddit...")
+
                     except (APIException, ClientException, Exception) as e:
                         self.add_msg(e)
-                        continue
-
+                        logging.error(str(e) + "\n\n")
+                        raise SkipThis("Couldn't get users. Skipping...")
+            
                 while True:
                     try:
+                        # get the list of subreddits
                         subredditList = self.get_subs(userList)
                         self.subredditList = []
                         break
 
-                    except (APIException, ClientException, Exception) as e:
+                    except (APIException, ClientException, OperationalError) as e:
                         self.add_msg(e)
-                        continue
-                
-                while True:
-                    try:
-                        subredditTuple = self.create_tuples(subreddit2, subredditList)
-                        self.subredditTuple = []
-                        break
+                        logging.error(str(e) + "\n\n")
+                        raise SkipThis("Couldn't get overlapping subreddits. Skipping...")
 
-                    except HTTPError as e:
-                        self.add_msg(e)
+                try:
+                    # get the list of tuples
+                    subredditTuple = self.create_tuples(subreddit2, subredditList)
 
-                self.add_db(subreddit2, subredditTuple, len(userList))
+                except Exception as e:
+                    self.add_msg(e)
+                    logging.error("Failed to create tuples. " + str(e) + "\n\n")
+                    raise SkipThis("Failed to create tuples. Skipping...")
+
+                try:
+                    self.add_db(subreddit2, subredditTuple, len(userList))
+
+                except Exception as e:
+                    self.add_msg(e)
+                    logging.error("Failed to add to database. " + str(e) + "\n\n")
+                    raise SkipThis("Failed to add data to database. Skipping...")
 
             else:
-                raise skipThis("Subreddit in banlist. Skipping...")
+                raise SkipThis("Subreddit in banlist. Skipping...")
 
         # Query statements need strings fed in tuples
         sub1 = (subreddit1,)
@@ -536,8 +576,12 @@ class SubredditAnalysis(object):
 
         con2.close()
 
-        # use the retrieved data to calculate similarity
-        similarity = "{0:.05f}".format((sqrt(AB * BA)) / (sqrt(float(A * B))))
+        try:
+            # use the retrieved data to calculate similarity
+            similarity = float("{0:.05f}".format((sqrt(AB * BA)) / (sqrt(float(A * B)))))
+
+        except ZeroDivisionError:
+            similarity = float(0.00000)
         
         return (subreddit2, similarity)
 
@@ -582,11 +626,15 @@ class SubredditAnalysis(object):
 
                 if subreddit2 not in self.banList:
 
-                    if len(self.simList) == 200:
+                    if len(self.simList) == self.similarityLimit:
                         break
 
-                    similarity = self.calculate_similarity(subreddit, subreddit2)
-                    self.simList.append(similarity)
+                    try:
+                        similarity = self.calculate_similarity(subreddit, subreddit2)
+                        self.simList.append(similarity)
+
+                    except SkipThis:
+                        continue
 
             self.simList.sort(key=operator.itemgetter(1), reverse=True)
 
@@ -659,9 +707,9 @@ class SubredditAnalysis(object):
         """
 
         if(self.setflair):
+            self.add_msg("Setting post's flair...")
             while True:
                 try:
-                    self.add_msg("Setting post's flair...")
                     self.client.set_flair(self.post_to, submission, flair_text=flairText)
                     break
 
@@ -672,7 +720,7 @@ class SubredditAnalysis(object):
                 except ModeratorRequired as e:
                     self.add_msg(e)
                     logging.error("Failed to set flair. " + str(e) + '\n' + str(submission.permalink) + "\n\n")
-                    raise skipThis("Could not assign flair. Moderator privileges are necessary.")
+                    raise SkipThis("Could not assign flair. Moderator privileges are necessary.")
     
 
     def log_info(self, info):
@@ -708,17 +756,15 @@ class SubredditAnalysis(object):
 
 
 class SettingsError(Exception):
-    
+    """
+    Gets raised when the settings.cfg file is missing.
+    """
 
-    def __init__(self, error):
-        print(error)
 
-
-class skipThis(Exception):
-    
-
-    def __init__(self, error):
-        print(error)
+class SkipThis(Exception):
+    """
+    Gets raised when a subreddit or function needs to be skipped.
+    """
 
 
 def login(username, password):
@@ -773,7 +819,7 @@ def check_subreddits(subredditList):
                     myBot.add_msg(e)
                     logging.error("Invalid subreddit. Removing from list." + str(e) + "\n\n")
                     subredditList.remove(subreddit)
-                    raise skipThis("Skipping invalid subreddit...")
+                    raise SkipThis("Skipping invalid subreddit...")
 
                 except (ConnectionResetError, HTTPError, timeout) as e:
                     myBot.add_msg(e)
@@ -793,16 +839,16 @@ def check_subreddits(subredditList):
 
                     myBot.add_msg("Waiting a minute to try again...")   
                     sleep(60)
-                    raise skipThis("Trying again...")
+                    raise SkipThis("Trying again...")
 
                 except (APIException, ClientException, Exception) as e:
                     myBot.add_msg(e)
                     logging.error(str(e) + "\n\n")
-                    raise skipThis("Something went wrong. Skipping...")
+                    raise SkipThis("Something went wrong. Skipping...")
 
             break
 
-        except skipThis:
+        except SkipThis:
             if i == 2:
                 sys.exit(1)
 
@@ -891,9 +937,9 @@ def main():
                         except (APIException, ClientException, Exception) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis("Something went wrong. Skipping...")
+                            raise SkipThis("Something went wrong. Skipping...")
 
-                except skipThis:
+                except SkipThis:
                     logging.error(str(e) + "\n\n")
                     myBot.log_post(subreddit, text)
                     continue
@@ -907,9 +953,9 @@ def main():
                         except (APIException, ClientException, Exception) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis("Couldn't flair post. Skipping...")
+                            raise SkipThis("Couldn't flair post. Skipping...")
 
-                    except skipThis:
+                    except SkipThis:
                         continue
 
                 con.close()
@@ -928,14 +974,14 @@ def main():
                             myBot.add_msg(e)
                             logging.error("Invalid subreddit. Removing from list." + str(e) + "\n\n")
                             drilldownList.remove(subreddit)
-                            raise skipThis("Skipping invalid subreddit...")
+                            raise SkipThis("Skipping invalid subreddit...")
 
                         except (APIException, ClientException, Exception) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis("Couldn't get users. Skipping...")
+                            raise SkipThis("Couldn't get users. Skipping...")
 
-                except skipThis:
+                except SkipThis:
                     continue
 
                 for user in userList:
@@ -952,12 +998,12 @@ def main():
                             myBot.subredditList = []
                             break
 
-                        except (APIException, ClientException) as e:
+                        except (APIException, ClientException, OperationalError) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis("Couldn't get overlapping subreddits. Skipping...")
+                            raise SkipThis("Couldn't get overlapping subreddits. Skipping...")
 
-                except skipThis:
+                except SkipThis:
                     continue
 
                 for sub in subredditList:
@@ -1016,9 +1062,9 @@ def main():
                         except (APIException, ClientException, Exception) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis("Couldn't submit post. Skipping...")
+                            raise SkipThis("Couldn't submit post. Skipping...")
 
-                except skipThis:
+                except SkipThis:
                     logging.error(str(e) + "\n\n")
                     myBot.log_post(subreddit, text)
                     continue
@@ -1033,14 +1079,14 @@ def main():
                         except ModeratorRequired as e:
                             myBot.add_msg(e)
                             logging.error("Failed to set flair. " + str(e) + '\n' + str(post.permalink) + "\n\n")
-                            raise skipThis("Need moderator privileges to set flair. Skipping...")
+                            raise SkipThis("Need moderator privileges to set flair. Skipping...")
 
                         except (APIException, ClientException, Exception) as e:
                             myBot.add_msg(e)
                             logging.error(str(e) + "\n\n")
-                            raise skipThis("Couldn't set flair. Skipping...")
+                            raise SkipThis("Couldn't set flair. Skipping...")
 
-                    except skipThis:
+                    except SkipThis:
                         continue
 
 
