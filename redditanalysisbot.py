@@ -89,7 +89,7 @@ class SubredditAnalysis(object):
                     self.banList.append(subreddit)
 
     
-    def add_msg(self, msg=None, newline=False):
+    def add_msg(self, msg=None, newline=True):
         """
         Simple function to make terminal output optional. Feed
         it the message to print out. Can also tell it to print a 
@@ -98,7 +98,7 @@ class SubredditAnalysis(object):
 
         if(self.verbose):
             if msg is not None:
-                print(msg)
+                print(msg, end='')
 
             if(newline):
                 print('\n')
@@ -157,7 +157,7 @@ class SubredditAnalysis(object):
                 # make sure that users don't get added multiple times
                 if submitter not in self.userList:
                     self.userList.append(submitter)
-                    self.add_msg("{0} users found up to thread ({1} / {2}).".format(len(self.userList), i + 1, self.scrapeLimit))
+                    self.add_msg("\r{0} users found up to thread ({1} / {2}).".format(len(self.userList), i + 1, self.scrapeLimit), newline=False)
 
 
             while True:
@@ -183,7 +183,7 @@ class SubredditAnalysis(object):
                 if comScore > self.minScore:
                     if commenter not in self.userList:
                         self.userList.append(commenter)
-                        self.add_msg("{0} users found up to thread ({1} / {2}).".format(len(self.userList), i + 1, self.scrapeLimit))
+                        self.add_msg("\r{0} users found up to thread ({1} / {2}).".format(len(self.userList), i + 1, self.scrapeLimit), newline=False)
 
         return self.userList
 
@@ -198,7 +198,7 @@ class SubredditAnalysis(object):
         subreddits.
         """
 
-        print("Scanning for overlapping subreddits...")
+        print("\nScanning for overlapping subreddits...")
         
 
         # keeps count on overlapping users
@@ -245,7 +245,7 @@ class SubredditAnalysis(object):
                 # keeps track of how many users are remaining
                 usersLeft = len(userList) - i - 1
 
-                self.add_msg("({0} / {1}) users remaining.".format(usersLeft, len(userList)))
+                self.add_msg("\r({0} / {1}) users remaining.".format(usersLeft, len(userList)), newline=False)
 
                 while True:
                     try:
@@ -302,7 +302,7 @@ class SubredditAnalysis(object):
                 # keeps track of how many users are remaining
                 usersLeft = len(userList) - i - 1
 
-                self.add_msg("({0} / {1}) users remaining.".format(usersLeft, len(userList)))
+                self.add_msg("\r({0} / {1}) users remaining.".format(usersLeft, len(userList)), newline=False)
 
                 con = db.connect("users/{0}".format(dbFile))
                 cur = con.cursor()
@@ -341,7 +341,7 @@ class SubredditAnalysis(object):
         contains the subreddit and the overlapping users.
         """
 
-        print("Creating tuples...")
+        print("\nCreating tuples...")
         
 
         # stores the tuples to be used for printing data
