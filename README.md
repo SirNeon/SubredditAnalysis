@@ -19,3 +19,7 @@ Linux users may need to use:
     
     sudo python setup.py install
     
+###Run The Bot
+The command to run the bot is:
+
+    python main.py
