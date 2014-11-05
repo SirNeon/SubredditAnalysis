@@ -135,7 +135,7 @@ class SubredditAnalysis(object):
                 break
 
             except (ConnectionResetError, HTTPError, timeout) as e:
-                self.add_msg(e)
+                self.add_msg('\n' + str(e))
                 continue
         
         # get the thread creator and if he's not
@@ -166,7 +166,7 @@ class SubredditAnalysis(object):
                     break
 
                 except (ConnectionResetError, HTTPError, timeout) as e:
-                    self.add_msg(e)
+                    self.add_msg('\n' + str(e))
                     continue
 
             # get the comment authors and append
@@ -425,7 +425,7 @@ class SubredditAnalysis(object):
         # so these are defined in case that sub1 or sub2 don't 
         # show up in the drilldown for one of them they can be
         # set equal to each other so the program can calculate the
-        # similarity between the 2 subsreddits.
+        # similarity between the 2 subreddits.
         AB = None
         BA = None
 
