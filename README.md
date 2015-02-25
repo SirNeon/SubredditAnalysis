@@ -20,6 +20,6 @@ Linux users may need to use:
     sudo python setup.py install
     
 ###Run The Bot
-The command to run the bot is:
+Navigate to the directory of the bot's files and run the command:
 
     python main.py
