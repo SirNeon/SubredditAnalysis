@@ -1,0 +1,28 @@
+# main
+banlist: on
+post_to: subreddit
+scrape_limit: 1000
+overview_limit: 1000
+similarity_limit: 400
+user_limit: 1000000
+set_flair: on
+similarity: off
+min_score: -4
+verbose: on
+
+# database
+hostaddr: 127.0.0.1
+port: 5432
+user: user
+data_db: subredditanalysis.db
+
+# login
+client_id: client_id
+secret: secret
+username: username
+password: password
+
+# logging
+info_logging: off
+post_logging: on
+error_logging: on
