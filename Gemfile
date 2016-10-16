@@ -1,4 +1,4 @@
 source 'rubygems.org'
 
-gem 'neonredd'
+gem 'NeonRAW'
 gem 'pg'
