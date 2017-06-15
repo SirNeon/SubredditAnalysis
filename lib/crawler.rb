@@ -44,9 +44,9 @@ class SubredditAnalysis
   #   to be ignored by the analysis bot if it is enabled in the settings.yaml
   #   file.
   def create_banlist
-    banlist_desired = @config['banlist']
+    banlist_is_desired = @config['banlist']
     ban_list = []
-    if banlist_desired && File.file?('banlist.txt')
+    if banlist_is_desired && File.file?('banlist.txt')
       File.open('banlist.txt', 'r').each { |line| ban_list << line.chomp }
     end
     ban_list
@@ -55,10 +55,12 @@ class SubredditAnalysis
   # Initializes the Redd.it client and creates a Reddit session.
   # @!method login
   def login
-    user_agent = 'Reddit Analysis Crawler by /u/SirNeon'
-
-    @client = NeonRAW.script(@config['username'], @config['password'],
-                             @config['client_id'], @config['secret'],
-                             user_agent: user_agent)
+    @client = NeonRAW.script(
+      @config['username'],
+      @config['password'],
+      @config['client_id'],
+      @config['secret'],
+      user_agent: 'Reddit Analysis Crawler by /u/SirNeon'
+    )
   end
 end

@@ -8,14 +8,13 @@ module RedditDataManager
   # @option opts [Integer] :limit The number of submissions to fetch.
   # @return [NeonRAW::Objects::Listing] Returns the scraped submissions.
   def get_submissions(subreddit, opts = {})
-    reddit_exception_handling do
+    handle_reddit_exceptions do
       scrape_limit = if opts[:limit].nil?
                        @config['scrape_limit']
                      else
                        opts[:limit]
                      end
-      submissions = @client.subreddit(subreddit).hot limit: scrape_limit
-      return submissions
+      return @client.subreddit(subreddit).hot limit: scrape_limit
     end
   end
 
@@ -25,23 +24,17 @@ module RedditDataManager
   # @param submission [NeonRAW::Objects::Submission] The submission object to
   #   scan.
   def get_users(user_list, submission)
-    reddit_exception_handling do
+    handle_reddit_exceptions do
       user_list << submission.author
-      comments = @client.flatten_tree(submission.comments)
+      comments = @client.flatten_tree submission.comments
       comments.each do |comment|
         if comment.morecomments?
-          subreddit = submission.subreddit
-          more_comments = nil
-          reddit_exception_handling do
-            more_comments = comment.expand(subreddit)
-            break
-          end
-          more_comments.each { |new_comment| user_list << new_comment.author }
+          comments += comment.expand submission.subreddit
+          next
         else
           user_list << comment.author
         end
       end
-      break
     end
   end
 
@@ -51,11 +44,8 @@ module RedditDataManager
   # @return [NeonRAW::Objects::Listing, nil] Returns either the overview or nil
   #   if the user is shadowbanned.
   def get_overview(username)
-    reddit_exception_handling do
-      user = @client.user username
-      overview_limit = @config['overview_limit']
-      overview = user.overview limit: overview_limit
-      return overview
+    handle_reddit_exceptions do
+      return @client.user(username).overview limit: @config['overview_limit']
     end
   end
 
@@ -69,8 +59,12 @@ module RedditDataManager
     overview.each do |item|
       type = 'comment' if item.comment?
       type = 'submission' if item.submission?
-      data << { 'subreddit' => item.subreddit, 'id' => item.id,
-                'score' => item.score, 'type' => type }
+      data << {
+        'subreddit' => item.subreddit,
+        'id' => item.id,
+        'score' => item.score,
+        'type' => type
+      }
     end
     data
   end
@@ -83,33 +77,34 @@ module RedditDataManager
   #   the tallies of overlapping users in their corresponding subreddits.
   def tally_user_data(username, user_data, overlap_tally)
     already_done = []
-    write_to_users_db(username, user_data)
+    write_to_users_db username, user_data
     user_data.each do |post|
-      next if already_done.include?(post['subreddit'])
-      already_done << post['subreddit']
+      next if already_done.include? post['subreddit']
       if post['score'] >= @config['min_score']
         overlap_tally[post['subreddit']] += 1
+        already_done << post['subreddit']
       end
     end
   end
 
   # Handles exceptions for things that involve getting data from Reddit.
-  # @!method reddit_exception_handling
+  # @!method handle_reddit_exceptions
   # @param block [&block] The block to have exceptions handled.
-  def reddit_exception_handling
+  def handle_reddit_exceptions
     loop do
       begin
         yield
+        break
       # user is shadowbanned or subreddit is banned; couldn't access the
       # user's overview.
       rescue NotFound, PermissionDenied
         return nil
-      rescue CouldntReachServer, InternalServerError, ServiceUnavailable
-        sleep(5)
+      rescue BadGateway, CouldntReachServer,
+             InternalServerError, ServiceUnavailable
+        sleep 5
         redo
       end
     end
   end
-
-  private :reddit_exception_handling
+  private :handle_reddit_exceptions
 end
