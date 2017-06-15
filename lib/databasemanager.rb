@@ -26,7 +26,7 @@ module DatabaseManager
   # @!method fetch_subreddits_data(subreddit)
   # @param thing_name [String] The name of the thing whose data you want.
   # @return [Array] Returns an array of hash tables containing the data.
-  %w(users subreddits).each do |type|
+  %w[users subreddits].each do |type|
     define_method :"fetch_#{type}_data" do |thing_name|
       @db.prepare('select_data', "SELECT * FROM #{type} WHERE thing_name=$1")
       cur = @db.exec_prepared('select_data', [thing_name])
@@ -47,7 +47,7 @@ module DatabaseManager
   # @!method write_to_subreddits_db(subreddit, subreddit_data)
   # @param thing_name [String] The name of the thing who data you want written.
   # @param thing_data [Array] An array of hash tables containing the data.
-  %w(users subreddits).each do |type|
+  %w[users subreddits].each do |type|
     define_method :"write_to_#{type}_db" do |thing_name, thing_data|
       check = public_send(:"fetch_#{type}_data", thing_name)
       return nil unless check.empty?
