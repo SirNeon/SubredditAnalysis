@@ -9,11 +9,7 @@ module RedditDataManager
   # @return [NeonRAW::Objects::Listing] Returns the scraped submissions.
   def get_submissions(subreddit, opts = {})
     handle_reddit_exceptions do
-      scrape_limit = if opts[:limit].nil?
-                       @config['scrape_limit']
-                     else
-                       opts[:limit]
-                     end
+      scrape_limit = opts[:limit] ? opts[:limit] : @config['scrape_limit']
       return @client.subreddit(subreddit).hot limit: scrape_limit
     end
   end
@@ -57,8 +53,7 @@ module RedditDataManager
   def gather_user_data(overview)
     data = []
     overview.each do |item|
-      type = 'comment' if item.comment?
-      type = 'submission' if item.submission?
+      type = item.comment? ? 'comment' : 'submission'
       data << {
         'subreddit' => item.subreddit,
         'id' => item.id,
